@@ -6,4 +6,6 @@ A very simple Operator to Scale down Deployments or StatefulSets during specific
 ```bash
 git clone https://github.com/z4ck404/CronJob-Scale-Down-Operator.git
 cd CronJob-Scale-Down-Operator
+
+<TODO>
 ```
