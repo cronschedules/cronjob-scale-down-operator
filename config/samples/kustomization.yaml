@@ -1,0 +1,4 @@
+## Append samples of your project ##
+resources:
+- cronschedules_v1_cronjobscaledown.yaml
+# +kubebuilder:scaffold:manifestskustomizesamples

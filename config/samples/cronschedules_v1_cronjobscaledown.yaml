@@ -1,0 +1,9 @@
+apiVersion: cronschedules.elbazi.co/v1
+kind: CronJobScaleDown
+metadata:
+  labels:
+    app.kubernetes.io/name: cronjob-scale-down-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: cronjobscaledown-sample
+spec:
+  # TODO(user): Add fields here
