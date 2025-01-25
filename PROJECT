@@ -7,4 +7,14 @@ layout:
 - go.kubebuilder.io/v4
 projectName: cronjob-scale-down-operator
 repo: github.com/z4ck404/cronjob-scale-down-operator
+resources:
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: elbazi.co
+  group: cronschedules
+  kind: CronJobScaleDown
+  path: github.com/z4ck404/cronjob-scale-down-operator/api/v1
+  version: v1
 version: "3"

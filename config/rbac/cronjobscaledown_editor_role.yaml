@@ -1,0 +1,33 @@
+# This rule is not used by the project cronjob-scale-down-operator itself.
+# It is provided to allow the cluster admin to help manage permissions for users.
+#
+# Grants permissions to create, update, and delete resources within the cronschedules.elbazi.co.
+# This role is intended for users who need to manage these resources
+# but should not control RBAC or manage permissions for others.
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: cronjob-scale-down-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: cronjobscaledown-editor-role
+rules:
+- apiGroups:
+  - cronschedules.elbazi.co
+  resources:
+  - cronjobscaledowns
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - cronschedules.elbazi.co
+  resources:
+  - cronjobscaledowns/status
+  verbs:
+  - get
