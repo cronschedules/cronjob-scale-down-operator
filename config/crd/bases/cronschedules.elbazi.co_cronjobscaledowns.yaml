@@ -1,0 +1,97 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.17.1
+  name: cronjobscaledowns.cronschedules.elbazi.co
+spec:
+  group: cronschedules.elbazi.co
+  names:
+    kind: CronJobScaleDown
+    listKind: CronJobScaleDownList
+    plural: cronjobscaledowns
+    singular: cronjobscaledown
+  scope: Namespaced
+  versions:
+  - name: v1
+    schema:
+      openAPIV3Schema:
+        description: CronJobScaleDown is the Schema for the cronjobscaledowns API.
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: CronJobScaleDownSpec defines the desired state of CronJobScaleDown.
+            properties:
+              scaleDownSchedule:
+                description: Cron schedule for scaling down (e.g., "0 22 * * *" for
+                  10 PM daily)
+                type: string
+              scaleUpSchedule:
+                description: Cron schedule for scaling back up (e.g., "0 6 * * *"
+                  for 6 AM daily)
+                type: string
+              targetRef:
+                description: Target resource to scale (Deployment/StatefulSet)
+                properties:
+                  apiVersion:
+                    description: ApiVersion of the target resource (Deployment/StatefulSet)
+                    type: string
+                  kind:
+                    description: Kind of the target resource (Deployment/StatefulSet)
+                    type: string
+                  name:
+                    description: Name of the target resource
+                    type: string
+                required:
+                - apiVersion
+                - kind
+                - name
+                type: object
+              timeZone:
+                description: 'Optional: Timezone (e.g., "America/New_York")'
+                type: string
+            required:
+            - scaleDownSchedule
+            - scaleUpSchedule
+            - targetRef
+            type: object
+          status:
+            description: CronJobScaleDownStatus defines the observed state of CronJobScaleDown.
+            properties:
+              currentReplicas:
+                description: CurrentReplicas is the current number of replicas
+                format: int32
+                type: integer
+              lastScaleDownTime:
+                description: LastScaleDownTime is the time when the scale down was
+                  last performed
+                format: date-time
+                type: string
+              lastScaleUpTime:
+                description: LastScaleUpTime is the time when the scale up was last
+                  performed
+                format: date-time
+                type: string
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
