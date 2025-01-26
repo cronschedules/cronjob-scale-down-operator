@@ -35,14 +35,7 @@ type CronJobScaleDownReconciler struct {
 	Scheme *runtime.Scheme
 }
 
-// +kubebuilder:rbac:groups=cronschedules.elbazi.co,resources=cronjobscaledowns,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=cronschedules.elbazi.co,resources=cronjobscaledowns/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=cronschedules.elbazi.co,resources=cronjobscaledowns/finalizers,verbs=update
-
-// For more details, check Reconcile and its Result here:
-// - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.20.0/pkg/reconcile
 func (r *CronJobScaleDownReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	_ = log.FromContext(ctx)
 
 	// The controller logic :
 	// 1. Get the CronJobScaleDown resource
@@ -66,17 +59,30 @@ func (r *CronJobScaleDownReconciler) Reconcile(ctx context.Context, req ctrl.Req
 
 	// Parse the cron schedule
 	schedule, err := parser.Parse(cronJobScaleDown.Spec.ScaleDownSchedule)
+	logger.Info("Schedule", "schedule", schedule)
 	if err != nil {
+		logger.Error(err, "Error parsing schedule")
+		return ctrl.Result{}, err
+	}
+	// Get the timezone
+	location, err := time.LoadLocation(cronJobScaleDown.Spec.TimeZone)
+	logger.Info("Timezone", "timezone", location)
+	if err != nil {
+		logger.Error(err, "Error loading timezone")
 		return ctrl.Result{}, err
 	}
 
 	// Get the next execution time
-	nextExecutionTime := schedule.Next(time.Now())
-
+	nextExecutionTime := schedule.Next(time.Now().In(location))
+	logger.Info("Next execution time", "nextExecutionTime", nextExecutionTime)
 	// If the next execution time is in the past, scale down the target resource
-	if nextExecutionTime.Before(time.Now()) {
+	if nextExecutionTime.Before(time.Now().In(location)) {
+		logger.Info("Next execution time is in the past, scaling down the target resource")
 		// Scale down the target resource
 		// Update the CronJobScaleDown resource status with the last scale down time
+	} else {
+		logger.Info("Next execution time is in the future, waiting for the next execution time")
+		return ctrl.Result{RequeueAfter: nextExecutionTime.Sub(time.Now().In(location))}, nil
 	}
 
 	// If the next execution time is in the future, return and wait for the next execution time
