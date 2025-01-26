@@ -18,7 +18,9 @@ package controller
 
 import (
 	"context"
+	"time"
 
+	"github.com/robfig/cron/v3"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -37,20 +39,48 @@ type CronJobScaleDownReconciler struct {
 // +kubebuilder:rbac:groups=cronschedules.elbazi.co,resources=cronjobscaledowns/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=cronschedules.elbazi.co,resources=cronjobscaledowns/finalizers,verbs=update
 
-// Reconcile is part of the main kubernetes reconciliation loop which aims to
-// move the current state of the cluster closer to the desired state.
-// TODO(user): Modify the Reconcile function to compare the state specified by
-// the CronJobScaleDown object against the actual cluster state, and then
-// perform operations to make the cluster state reflect the state specified by
-// the user.
-//
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.20.0/pkg/reconcile
 func (r *CronJobScaleDownReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	_ = log.FromContext(ctx)
 
-	// TODO(user): your logic here
+	// The controller logic :
+	// 1. Get the CronJobScaleDown resource
+	// 2. Parse the cron schedule and get the next execution time or what is the next time to scale down
+	// 3. If the next execution time is in the past, scale down the target resource
+	// 4. Update the CronJobScaleDown resource status with the last scale down time
+	// 5. If the next execution time is in the future, return and wait for the next execution time
 
+	logger := log.FromContext(ctx)
+	logger.Info("Reconciling CronJobScaleDown", "name", req.NamespacedName)
+
+	// Get the CronJobScaleDown resource
+	cronJobScaleDown := &cronschedulesv1.CronJobScaleDown{}
+	if err := r.Get(ctx, req.NamespacedName, cronJobScaleDown); err != nil {
+		return ctrl.Result{}, err
+	}
+
+	// Parse the cron schedule and get the next execution time or what is the next time to scale down
+	// Create a new cron parser
+	parser := cron.NewParser(cron.Second | cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow)
+
+	// Parse the cron schedule
+	schedule, err := parser.Parse(cronJobScaleDown.Spec.ScaleDownSchedule)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+
+	// Get the next execution time
+	nextExecutionTime := schedule.Next(time.Now())
+
+	// If the next execution time is in the past, scale down the target resource
+	if nextExecutionTime.Before(time.Now()) {
+		// Scale down the target resource
+		// Update the CronJobScaleDown resource status with the last scale down time
+	}
+
+	// If the next execution time is in the future, return and wait for the next execution time
+	//return ctrl.Result{RequeueAfter: nextExecutionTime.Sub(time.Now())}, nil
 	return ctrl.Result{}, nil
 }
 
