@@ -20,22 +20,43 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
-// NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
-
 // CronJobScaleDownSpec defines the desired state of CronJobScaleDown.
 type CronJobScaleDownSpec struct {
-	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
+	// Target resource to scale (Deployment/StatefulSet)
+	TargetRef TargetRef `json:"targetRef"`
 
-	// Foo is an example field of CronJobScaleDown. Edit cronjobscaledown_types.go to remove/update
-	Foo string `json:"foo,omitempty"`
+	// Cron schedule for scaling down (e.g., "0 22 * * *" for 10 PM daily)
+	ScaleDownSchedule string `json:"scaleDownSchedule"`
+
+	// Cron schedule for scaling back up (e.g., "0 6 * * *" for 6 AM daily)
+	ScaleUpSchedule string `json:"scaleUpSchedule"`
+
+	// Optional: Timezone (e.g., "America/New_York")
+	TimeZone string `json:"timeZone,omitempty"`
+}
+
+type TargetRef struct {
+
+	// ApiVersion of the target resource (Deployment/StatefulSet)
+	ApiVersion string `json:"apiVersion"` // e.g. apps/v1
+
+	// Kind of the target resource (Deployment/StatefulSet)
+	Kind string `json:"kind"` // e.g. Deployment
+
+	// Name of the target resource
+	Name string `json:"name"` // e.g. my-deployment
 }
 
 // CronJobScaleDownStatus defines the observed state of CronJobScaleDown.
 type CronJobScaleDownStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
+	// LastScaleDownTime is the time when the scale down was last performed
+	LastScaleDownTime metav1.Time `json:"lastScaleDownTime,omitempty"`
+
+	// LastScaleUpTime is the time when the scale up was last performed
+	LastScaleUpTime metav1.Time `json:"lastScaleUpTime,omitempty"`
+
+	// CurrentReplicas is the current number of replicas
+	CurrentReplicas int32 `json:"currentReplicas,omitempty"`
 }
 
 // +kubebuilder:object:root=true
