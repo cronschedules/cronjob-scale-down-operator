@@ -1,0 +1,18 @@
+name: Build and push the operator image
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+      - name: Build the operator
+        run: |
+          make build
+      - name: Push the operator image
+        run: |
+          make push
