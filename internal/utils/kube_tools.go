@@ -22,12 +22,13 @@ const (
 	annotationKeyOriginalReplicas = "cronjob-scale-down-operator/original-replicas"
 )
 
-//Documentation of the logic:
+// Documentation of the logic:
 // 1. Get the target resource (deployment or statefulset)
 // 2. Scale down the target resource to 0 replicas
 // 3. Update the target resource status with the last scale down time
 // 4. If the next execution time is in the future, return and wait for the next execution time
 
+//lint:ignore U1000 Ignore unused function
 func scaleDown(ctx context.Context, c *K8sClient, targetRef cronschedulesv1.TargetRef) error {
 	logger := log.FromContext(ctx)
 	logger.Info("Scaling down the target resource", "targetRef", targetRef)
@@ -42,6 +43,7 @@ func scaleDown(ctx context.Context, c *K8sClient, targetRef cronschedulesv1.Targ
 	return nil
 }
 
+//lint:ignore U1000 Ignore unused function
 func scaleUp(ctx context.Context, targetRef cronschedulesv1.TargetRef) error {
 
 	logger := log.FromContext(ctx)
@@ -121,6 +123,7 @@ func (c *K8sClient) ScaleDownTargetResource(ctx context.Context, targetRef crons
 	return nil
 }
 
+//lint:ignore U1000 Ignore unused function
 func scaleUpTargetResource(ctx context.Context, targetResource client.Object) error {
 
 	return nil
