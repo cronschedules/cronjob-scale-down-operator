@@ -36,15 +36,14 @@ type CronJobScaleDownSpec struct {
 }
 
 type TargetRef struct {
-
-	// ApiVersion of the target resource (Deployment/StatefulSet)
-	ApiVersion string `json:"apiVersion"` // e.g. apps/v1
-
-	// Kind of the target resource (Deployment/StatefulSet)
-	Kind string `json:"kind"` // e.g. Deployment
-
 	// Name of the target resource
-	Name string `json:"name"` // e.g. my-deployment
+	Name string `json:"name"`
+	// Namespace of the target resource
+	Namespace string `json:"namespace"`
+	// Kind of the target resource (Deployment, StatefulSet)
+	Kind string `json:"kind"`
+	// ApiVersion of the target resource
+	ApiVersion string `json:"apiVersion"`
 }
 
 // CronJobScaleDownStatus defines the observed state of CronJobScaleDown.

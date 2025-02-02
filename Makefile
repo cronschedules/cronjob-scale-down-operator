@@ -1,5 +1,8 @@
 # Image URL to use all building/pushing image targets
-IMG ?= controller:latest
+REGISTRY ?=
+IMAGE_NAME ?= 
+IMAGE_TAG ?= 
+IMG ?= ${REGISTRY}/${IMAGE_NAME}:$(IMAGE_TAG)
 
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
 ifeq (,$(shell go env GOBIN))

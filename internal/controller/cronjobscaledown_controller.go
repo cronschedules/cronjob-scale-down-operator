@@ -21,12 +21,14 @@ import (
 	"time"
 
 	"github.com/robfig/cron/v3"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	cronschedulesv1 "github.com/z4ck404/cronjob-scale-down-operator/api/v1"
+	"github.com/z4ck404/cronjob-scale-down-operator/internal/utils"
 )
 
 // CronJobScaleDownReconciler reconciles a CronJobScaleDown object
@@ -78,15 +80,24 @@ func (r *CronJobScaleDownReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	// If the next execution time is in the past, scale down the target resource
 	if nextExecutionTime.Before(time.Now().In(location)) {
 		logger.Info("Next execution time is in the past, scaling down the target resource")
-		// Scale down the target resource
+		k8sClient := &utils.K8sClient{Client: r.Client}
+		err := k8sClient.ScaleDownTargetResource(ctx, cronJobScaleDown.Spec.TargetRef)
+		if err != nil {
+			logger.Error(err, "Error scaling down target resource")
+			return ctrl.Result{}, err
+		}
 		// Update the CronJobScaleDown resource status with the last scale down time
+		cronJobScaleDown.Status.LastScaleDownTime = metav1.Time{Time: time.Now().In(location)}
+		err = r.Update(ctx, cronJobScaleDown)
+		if err != nil {
+			logger.Error(err, "Error updating CronJobScaleDown resource status")
+			return ctrl.Result{}, err
+		}
 	} else {
 		logger.Info("Next execution time is in the future, waiting for the next execution time")
 		return ctrl.Result{RequeueAfter: nextExecutionTime.Sub(time.Now().In(location))}, nil
 	}
 
-	// If the next execution time is in the future, return and wait for the next execution time
-	//return ctrl.Result{RequeueAfter: nextExecutionTime.Sub(time.Now())}, nil
 	return ctrl.Result{}, nil
 }
 
