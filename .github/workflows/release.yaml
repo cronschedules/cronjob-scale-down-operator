@@ -18,10 +18,12 @@ jobs:
       - name: Get version
         id: get_version
         run: |
-          VERSION=$(cat VERSION)
+          # Read version file and trim whitespace
+          VERSION=$(cat VERSION | tr -d '\n')
+          # Set both environment variable and step output
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
           echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "version=$VERSION" >> $GITHUB_ENV
-          
+
       - name: Build
         run: make build
 
