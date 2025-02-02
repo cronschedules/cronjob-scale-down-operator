@@ -38,7 +38,7 @@ var _ = Describe("CronJobScaleDown Controller", func() {
 
 		typeNamespacedName := types.NamespacedName{
 			Name:      resourceName,
-			Namespace: "default", // TODO(user):Modify as needed
+			Namespace: "default",
 		}
 		cronjobscaledown := &cronschedulesv1.CronJobScaleDown{}
 
@@ -51,7 +51,14 @@ var _ = Describe("CronJobScaleDown Controller", func() {
 						Name:      resourceName,
 						Namespace: "default",
 					},
-					// TODO(user): Specify other spec details if needed.
+					Spec: cronschedulesv1.CronJobScaleDownSpec{
+						TargetRef: cronschedulesv1.TargetRef{
+							Name:      "test-deployment",
+							Namespace: "default",
+							Kind:      "Deployment",
+						},
+						TimeZone: "Europe/Berlin",
+					},
 				}
 				Expect(k8sClient.Create(ctx, resource)).To(Succeed())
 			}

@@ -1,0 +1,443 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/name: cronjob-scale-down-operator
+    control-plane: controller-manager
+  name: cronjob-scale-down-operator-system
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.17.1
+  name: cronjobscaledowns.cronschedules.elbazi.co
+spec:
+  group: cronschedules.elbazi.co
+  names:
+    kind: CronJobScaleDown
+    listKind: CronJobScaleDownList
+    plural: cronjobscaledowns
+    singular: cronjobscaledown
+  scope: Namespaced
+  versions:
+  - name: v1
+    schema:
+      openAPIV3Schema:
+        description: CronJobScaleDown is the Schema for the cronjobscaledowns API.
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: CronJobScaleDownSpec defines the desired state of CronJobScaleDown.
+            properties:
+              scaleDownSchedule:
+                description: Cron schedule for scaling down (e.g., "0 22 * * *" for
+                  10 PM daily)
+                type: string
+              scaleUpSchedule:
+                description: Cron schedule for scaling back up (e.g., "0 6 * * *"
+                  for 6 AM daily)
+                type: string
+              targetRef:
+                description: Target resource to scale (Deployment/StatefulSet)
+                properties:
+                  apiVersion:
+                    description: ApiVersion of the target resource
+                    type: string
+                  kind:
+                    description: Kind of the target resource (Deployment, StatefulSet)
+                    type: string
+                  name:
+                    description: Name of the target resource
+                    type: string
+                  namespace:
+                    description: Namespace of the target resource
+                    type: string
+                required:
+                - apiVersion
+                - kind
+                - name
+                - namespace
+                type: object
+              timeZone:
+                description: 'Optional: Timezone (e.g., "America/New_York")'
+                type: string
+            required:
+            - scaleDownSchedule
+            - scaleUpSchedule
+            - targetRef
+            type: object
+          status:
+            description: CronJobScaleDownStatus defines the observed state of CronJobScaleDown.
+            properties:
+              currentReplicas:
+                description: CurrentReplicas is the current number of replicas
+                format: int32
+                type: integer
+              lastScaleDownTime:
+                description: LastScaleDownTime is the time when the scale down was
+                  last performed
+                format: date-time
+                type: string
+              lastScaleUpTime:
+                description: LastScaleUpTime is the time when the scale up was last
+                  performed
+                format: date-time
+                type: string
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/name: cronjob-scale-down-operator
+  name: cronjob-scale-down-operator-controller-manager
+  namespace: cronjob-scale-down-operator-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/name: cronjob-scale-down-operator
+  name: cronjob-scale-down-operator-leader-election-role
+  namespace: cronjob-scale-down-operator-system
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - configmaps
+  - deployments
+  - statefulsets
+  verbs:
+  - get
+  - list
+  - watch
+  - update
+  - patch
+- apiGroups:
+  - coordination.k8s.io
+  resources:
+  - leases
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - ""
+  resources:
+  - events
+  verbs:
+  - create
+  - patch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/name: cronjob-scale-down-operator
+  name: cronjob-scale-down-operator-cronjobscaledown-admin-role
+rules:
+- apiGroups:
+  - cronschedules.elbazi.co
+  resources:
+  - cronjobscaledowns
+  verbs:
+  - '*'
+- apiGroups:
+  - cronschedules.elbazi.co
+  resources:
+  - cronjobscaledowns/status
+  verbs:
+  - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/name: cronjob-scale-down-operator
+  name: cronjob-scale-down-operator-cronjobscaledown-editor-role
+rules:
+- apiGroups:
+  - cronschedules.elbazi.co
+  resources:
+  - cronjobscaledowns
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - cronschedules.elbazi.co
+  resources:
+  - cronjobscaledowns/status
+  verbs:
+  - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/name: cronjob-scale-down-operator
+  name: cronjob-scale-down-operator-cronjobscaledown-viewer-role
+rules:
+- apiGroups:
+  - cronschedules.elbazi.co
+  resources:
+  - cronjobscaledowns
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - cronschedules.elbazi.co
+  resources:
+  - cronjobscaledowns/status
+  verbs:
+  - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: cronjob-scale-down-operator-manager-role
+rules:
+- apiGroups:
+  - cronschedules.elbazi.co
+  resources:
+  - cronjobscaledowns
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - apps
+  resources:
+  - deployments
+  - statefulsets
+  verbs:
+  - get
+  - list
+  - watch
+  - update
+  - patch
+- apiGroups:
+  - cronschedules.elbazi.co
+  resources:
+  - cronjobscaledowns/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - cronschedules.elbazi.co
+  resources:
+  - cronjobscaledowns/status
+  verbs:
+  - get
+  - patch
+  - update
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: cronjob-scale-down-operator-metrics-auth-role
+rules:
+- apiGroups:
+  - authentication.k8s.io
+  resources:
+  - tokenreviews
+  verbs:
+  - create
+- apiGroups:
+  - authorization.k8s.io
+  resources:
+  - subjectaccessreviews
+  verbs:
+  - create
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: cronjob-scale-down-operator-metrics-reader
+rules:
+- nonResourceURLs:
+  - /metrics
+  verbs:
+  - get
+- apiGroups:
+  - apps
+  resources:
+  - deployments
+  - statefulsets
+  verbs:
+  - get
+  - list
+  - watch
+  - update
+  - patch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/name: cronjob-scale-down-operator
+  name: cronjob-scale-down-operator-leader-election-rolebinding
+  namespace: cronjob-scale-down-operator-system
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: cronjob-scale-down-operator-leader-election-role
+subjects:
+- kind: ServiceAccount
+  name: cronjob-scale-down-operator-controller-manager
+  namespace: cronjob-scale-down-operator-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/name: cronjob-scale-down-operator
+  name: cronjob-scale-down-operator-manager-rolebinding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cronjob-scale-down-operator-manager-role
+subjects:
+- kind: ServiceAccount
+  name: cronjob-scale-down-operator-controller-manager
+  namespace: cronjob-scale-down-operator-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: cronjob-scale-down-operator-metrics-auth-rolebinding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cronjob-scale-down-operator-metrics-auth-role
+subjects:
+- kind: ServiceAccount
+  name: cronjob-scale-down-operator-controller-manager
+  namespace: cronjob-scale-down-operator-system
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/name: cronjob-scale-down-operator
+    control-plane: controller-manager
+  name: cronjob-scale-down-operator-controller-manager-metrics-service
+  namespace: cronjob-scale-down-operator-system
+spec:
+  ports:
+  - name: https
+    port: 8443
+    protocol: TCP
+    targetPort: 8443
+  selector:
+    app.kubernetes.io/name: cronjob-scale-down-operator
+    control-plane: controller-manager
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/name: cronjob-scale-down-operator
+    control-plane: controller-manager
+  name: cronjob-scale-down-operator-controller-manager
+  namespace: cronjob-scale-down-operator-system
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: cronjob-scale-down-operator
+      control-plane: controller-manager
+  template:
+    metadata:
+      annotations:
+        kubectl.kubernetes.io/default-container: manager
+      labels:
+        app.kubernetes.io/name: cronjob-scale-down-operator
+        control-plane: controller-manager
+    spec:
+      containers:
+      - args:
+        - --metrics-bind-address=:8443
+        - --leader-elect
+        - --health-probe-bind-address=:8081
+        command:
+        - /manager
+        image: controller:latest
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8081
+          initialDelaySeconds: 15
+          periodSeconds: 20
+        name: manager
+        ports: []
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: 8081
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        resources:
+          limits:
+            cpu: 500m
+            memory: 128Mi
+          requests:
+            cpu: 10m
+            memory: 64Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+        volumeMounts: []
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      serviceAccountName: cronjob-scale-down-operator-controller-manager
+      terminationGracePeriodSeconds: 10
+      volumes: []

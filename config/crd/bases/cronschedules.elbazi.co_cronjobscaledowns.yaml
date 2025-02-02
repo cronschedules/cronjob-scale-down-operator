@@ -51,18 +51,22 @@ spec:
                 description: Target resource to scale (Deployment/StatefulSet)
                 properties:
                   apiVersion:
-                    description: ApiVersion of the target resource (Deployment/StatefulSet)
+                    description: ApiVersion of the target resource
                     type: string
                   kind:
-                    description: Kind of the target resource (Deployment/StatefulSet)
+                    description: Kind of the target resource (Deployment, StatefulSet)
                     type: string
                   name:
                     description: Name of the target resource
+                    type: string
+                  namespace:
+                    description: Namespace of the target resource
                     type: string
                 required:
                 - apiVersion
                 - kind
                 - name
+                - namespace
                 type: object
               timeZone:
                 description: 'Optional: Timezone (e.g., "America/New_York")'
