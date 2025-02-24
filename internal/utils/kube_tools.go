@@ -77,13 +77,6 @@ func (c *K8sClient) ScaleDownTargetResource(ctx context.Context, targetRef crons
 			return err
 		}
 
-		// Update the original replicas annotation
-		err = c.updateTargetResourceOriginalReplicasAnnotation(ctx, deployment, *deployment.Spec.Replicas)
-		if err != nil {
-			logger.Error(err, "Error updating target resource original replicas annotation")
-			return err
-		}
-
 		logger.Info("Deployment %s scaled down successfully", deployment.GetName())
 
 	} else if targetRef.Kind == "StatefulSet" {
@@ -105,13 +98,6 @@ func (c *K8sClient) ScaleDownTargetResource(ctx context.Context, targetRef crons
 		err = c.scaleDownStatefulset(ctx, statefulset)
 		if err != nil {
 			logger.Error(err, "Error scaling down statefulset %s", statefulset.GetName())
-			return err
-		}
-
-		// Update the original replicas annotation
-		err = c.updateTargetResourceOriginalReplicasAnnotation(ctx, statefulset, *statefulset.Spec.Replicas)
-		if err != nil {
-			logger.Error(err, "Error updating target resource original replicas annotation")
 			return err
 		}
 
@@ -160,22 +146,21 @@ func (c *K8sClient) GetReplicasCount(ctx context.Context, targetResource client.
 	return replicas
 }
 
-func (c *K8sClient) updateTargetResourceOriginalReplicasAnnotation(ctx context.Context, targetResource client.Object, replicas int32) error {
-
-	originalReplicas, ok := targetResource.GetAnnotations()[annotationKeyOriginalReplicas]
-	if !ok {
-		originalReplicas = strconv.Itoa(int(replicas))
+func (c *K8sClient) UpdateTargetResourceOriginalReplicasAnnotation(ctx context.Context, targetResource client.Object) error {
+	_, ok := targetResource.GetAnnotations()[annotationKeyOriginalReplicas]
+	if ok {
+		fmt.Println("Original replicas annotation already exists")
+		return nil
 	}
 
-	originalReplicasInt, err := strconv.Atoi(originalReplicas)
-	if err != nil {
-		return fmt.Errorf("failed to convert originalReplicas to int: %w", err)
+	originalTargetResourceReplicas := c.GetReplicasCount(ctx, targetResource)
+	if originalTargetResourceReplicas == nil {
+		return fmt.Errorf("failed to get original replicas count for target resource is not supported")
 	}
 
-	targetResource.SetAnnotations(map[string]string{annotationKeyOriginalReplicas: strconv.Itoa(originalReplicasInt)})
+	targetResource.SetAnnotations(map[string]string{annotationKeyOriginalReplicas: strconv.Itoa(*originalTargetResourceReplicas)})
 
-	err = c.Update(ctx, targetResource)
-	if err != nil {
+	if err := c.Update(ctx, targetResource); err != nil {
 		return fmt.Errorf("failed to update target resource original replicas annotation: %w", err)
 	}
 
