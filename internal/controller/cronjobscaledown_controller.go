@@ -48,6 +48,7 @@ func (r *CronJobScaleDownReconciler) Reconcile(ctx context.Context, req ctrl.Req
 
 	logger := log.FromContext(ctx)
 	logger.Info("Reconciling CronJobScaleDown", "name", req.NamespacedName)
+	k8sClient := &utils.K8sClient{Client: r.Client}
 
 	// Get the CronJobScaleDown resource
 	cronJobScaleDown := &cronschedulesv1.CronJobScaleDown{}
@@ -80,7 +81,6 @@ func (r *CronJobScaleDownReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	// If the next execution time is in the past, scale down the target resource
 	if nextExecutionTime.Before(time.Now().In(location)) {
 		logger.Info("Next execution time is in the past, scaling down the target resource")
-		k8sClient := &utils.K8sClient{Client: r.Client}
 		err := k8sClient.ScaleDownTargetResource(ctx, cronJobScaleDown.Spec.TargetRef)
 		if err != nil {
 			logger.Error(err, "Error scaling down target resource")
@@ -94,7 +94,11 @@ func (r *CronJobScaleDownReconciler) Reconcile(ctx context.Context, req ctrl.Req
 			return ctrl.Result{}, err
 		}
 	} else {
-		// See if the deployement has the annotation of original replicas
+		err := k8sClient.UpdateTargetResourceOriginalReplicasAnnotation(ctx, cronJobScaleDown.Spec.TargetRef)
+		if err != nil {
+			logger.Error(err, "Error updating target resource original replicas annotation")
+			return ctrl.Result{}, err
+		}
 		logger.Info("Next execution time is in the future, waiting for the next execution time")
 		return ctrl.Result{RequeueAfter: nextExecutionTime.Sub(time.Now().In(location))}, nil
 	}
