@@ -61,7 +61,7 @@ func (r *CronJobScaleDownReconciler) Reconcile(ctx context.Context, req ctrl.Req
 
 	// Parse the cron schedule
 	schedule, err := parser.Parse(cronJobScaleDown.Spec.ScaleDownSchedule)
-	logger.Info("Schedule", "schedule", schedule)
+	logger.Info("Schedule", schedule)
 	if err != nil {
 		logger.Error(err, "Error parsing schedule")
 		return ctrl.Result{}, err
@@ -76,7 +76,7 @@ func (r *CronJobScaleDownReconciler) Reconcile(ctx context.Context, req ctrl.Req
 
 	// Get the next execution time
 	nextExecutionTime := schedule.Next(time.Now().In(location))
-	logger.Info("Next execution time", "nextExecutionTime", nextExecutionTime)
+	logger.Info("Next execution time", nextExecutionTime)
 	// If the next execution time is in the past, scale down the target resource
 	if nextExecutionTime.Before(time.Now().In(location)) {
 		logger.Info("Next execution time is in the past, scaling down the target resource")
@@ -94,6 +94,7 @@ func (r *CronJobScaleDownReconciler) Reconcile(ctx context.Context, req ctrl.Req
 			return ctrl.Result{}, err
 		}
 	} else {
+		// See if the deployement has the annotation of original replicas
 		logger.Info("Next execution time is in the future, waiting for the next execution time")
 		return ctrl.Result{RequeueAfter: nextExecutionTime.Sub(time.Now().In(location))}, nil
 	}
