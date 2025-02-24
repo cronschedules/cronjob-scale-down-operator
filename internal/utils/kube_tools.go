@@ -139,6 +139,27 @@ func (c *K8sClient) scaleDownStatefulset(ctx context.Context, statefulset *appsv
 	return c.Update(ctx, statefulset)
 }
 
+func (c *K8sClient) GetReplicasCount(ctx context.Context, targetResource client.Object) *int {
+	var replicas *int
+
+	switch targetResource := targetResource.(type) {
+	case *appsv1.Deployment:
+		if targetResource.Spec.Replicas != nil {
+			replicasValue := int(*targetResource.Spec.Replicas)
+			replicas = &replicasValue
+		}
+	case *appsv1.StatefulSet:
+		if targetResource.Spec.Replicas != nil {
+			replicasValue := int(*targetResource.Spec.Replicas)
+			replicas = &replicasValue
+		}
+	default:
+		fmt.Println("Unsupported target resource kind")
+		return nil
+	}
+	return replicas
+}
+
 func (c *K8sClient) updateTargetResourceOriginalReplicasAnnotation(ctx context.Context, targetResource client.Object, replicas int32) error {
 
 	originalReplicas, ok := targetResource.GetAnnotations()[annotationKeyOriginalReplicas]
