@@ -18,6 +18,10 @@ type K8sClient struct {
 	client.Client
 }
 
+type TargetObject struct {
+	cronschedulesv1.TargetRef
+}
+
 const (
 	annotationKeyOriginalReplicas = "cronjob-scale-down-operator/original-replicas"
 )
@@ -29,7 +33,7 @@ const (
 // 4. If the next execution time is in the future, return and wait for the next execution time
 
 //lint:ignore U1000 Ignore unused function
-func scaleDown(ctx context.Context, c *K8sClient, targetRef cronschedulesv1.TargetRef) error {
+func scaleDown(ctx context.Context, c *K8sClient, targetRef TargetObject) error {
 	logger := log.FromContext(ctx)
 	logger.Info("Scaling down the target resource", "targetRef", targetRef)
 
@@ -44,19 +48,18 @@ func scaleDown(ctx context.Context, c *K8sClient, targetRef cronschedulesv1.Targ
 }
 
 //lint:ignore U1000 Ignore unused function
-func scaleUp(ctx context.Context, targetRef cronschedulesv1.TargetRef) error {
+func scaleUp(ctx context.Context, targetRef TargetObject) error {
 
 	logger := log.FromContext(ctx)
 	logger.Info("Scaling up the target resource", "targetRef", targetRef)
 	// TODO: Implement the logic to scale up the target resource
 	return nil
 }
-
-func (c *K8sClient) ScaleDownTargetResource(ctx context.Context, targetRef cronschedulesv1.TargetRef) error {
+func (c *K8sClient) ScaleDownTargetResource(ctx context.Context, targetRef TargetObject) error {
 	logger := log.FromContext(ctx)
 
-	if targetRef.Kind == "Deployment" {
-		// Get the deployment
+	switch targetRef.Kind {
+	case "Deployment":
 		deployment := &appsv1.Deployment{}
 		err := c.Get(ctx, client.ObjectKey{Name: targetRef.Name, Namespace: targetRef.Namespace}, deployment)
 		if err != nil {
@@ -64,13 +67,11 @@ func (c *K8sClient) ScaleDownTargetResource(ctx context.Context, targetRef crons
 			return err
 		}
 
-		// Check if the deployment is valid
 		if deployment.Spec.Replicas != nil && *deployment.Spec.Replicas == 0 {
 			logger.Info("Deployment %s is already scaled down, skipping scale down", deployment.GetName())
 			return nil
 		}
 
-		// Scale down the deployment
 		err = c.scaleDownDeployment(ctx, deployment)
 		if err != nil {
 			logger.Error(err, "Error scaling down deployment")
@@ -79,8 +80,7 @@ func (c *K8sClient) ScaleDownTargetResource(ctx context.Context, targetRef crons
 
 		logger.Info("Deployment %s scaled down successfully", deployment.GetName())
 
-	} else if targetRef.Kind == "StatefulSet" {
-		// Get the statefulset
+	case "StatefulSet":
 		statefulset := &appsv1.StatefulSet{}
 		err := c.Get(ctx, client.ObjectKey{Name: targetRef.Name, Namespace: targetRef.Namespace}, statefulset)
 		if err != nil {
@@ -88,13 +88,11 @@ func (c *K8sClient) ScaleDownTargetResource(ctx context.Context, targetRef crons
 			return err
 		}
 
-		// Check if the statefulset is valid
 		if statefulset.Spec.Replicas != nil && *statefulset.Spec.Replicas == 0 {
 			logger.Info("Statefulset %s is already scaled down, skipping scale down", statefulset.GetName())
 			return nil
 		}
 
-		// Scale down the statefulset
 		err = c.scaleDownStatefulset(ctx, statefulset)
 		if err != nil {
 			logger.Error(err, "Error scaling down statefulset %s", statefulset.GetName())
@@ -102,7 +100,7 @@ func (c *K8sClient) ScaleDownTargetResource(ctx context.Context, targetRef crons
 		}
 
 		logger.Info("Statefulset %s scaled down successfully", statefulset.GetName())
-	} else {
+	default:
 		return fmt.Errorf("unsupported target resource kind: %s", targetRef.Kind)
 	}
 
@@ -125,42 +123,68 @@ func (c *K8sClient) scaleDownStatefulset(ctx context.Context, statefulset *appsv
 	return c.Update(ctx, statefulset)
 }
 
-func (c *K8sClient) GetReplicasCount(ctx context.Context, targetResource client.Object) *int {
-	var replicas *int
+func (c *K8sClient) GetReplicasCount(ctx context.Context, targetResource TargetObject) *int32 {
+	var replicas *int32
 
-	switch targetResource := targetResource.(type) {
-	case *appsv1.Deployment:
-		if targetResource.Spec.Replicas != nil {
-			replicasValue := int(*targetResource.Spec.Replicas)
-			replicas = &replicasValue
+	switch targetResource.Kind {
+	case "Deployment":
+		deployment := &appsv1.Deployment{}
+		err := c.Get(ctx, client.ObjectKey{Name: targetResource.Name, Namespace: targetResource.Namespace}, deployment)
+		if err != nil {
+			fmt.Println("Error getting deployment from the cluster")
+			return nil
 		}
-	case *appsv1.StatefulSet:
-		if targetResource.Spec.Replicas != nil {
-			replicasValue := int(*targetResource.Spec.Replicas)
-			replicas = &replicasValue
+		replicas = deployment.Spec.Replicas
+
+	case "StatefulSet":
+		statefulset := &appsv1.StatefulSet{}
+		err := c.Get(ctx, client.ObjectKey{Name: targetResource.Name, Namespace: targetResource.Namespace}, statefulset)
+		if err != nil {
+			fmt.Println("Error getting statefulset from the cluster")
+			return nil
 		}
+		replicas = statefulset.Spec.Replicas
 	default:
 		fmt.Println("Unsupported target resource kind")
-		return nil
 	}
+
 	return replicas
 }
 
-func (c *K8sClient) UpdateTargetResourceOriginalReplicasAnnotation(ctx context.Context, targetResource client.Object) error {
-	_, ok := targetResource.GetAnnotations()[annotationKeyOriginalReplicas]
-	if ok {
+func (c *K8sClient) UpdateTargetResourceOriginalReplicasAnnotation(ctx context.Context, targetResource TargetObject) error {
+	var targetResourceObject client.Object
+
+	switch targetResource.Kind {
+	case "Deployment":
+		targetResourceObject = &appsv1.Deployment{}
+	case "StatefulSet":
+		targetResourceObject = &appsv1.StatefulSet{}
+	default:
+		return fmt.Errorf("unsupported target resource kind: %s", targetResource.Kind)
+	}
+
+	if err := c.Get(ctx, client.ObjectKey{Name: targetResource.Name, Namespace: targetResource.Namespace}, targetResourceObject); err != nil {
+		return fmt.Errorf("failed to get target resource: %w", err)
+	}
+
+	annotations := targetResourceObject.GetAnnotations()
+	if annotations == nil {
+		annotations = make(map[string]string)
+	}
+	if _, ok := annotations[annotationKeyOriginalReplicas]; ok {
 		fmt.Println("Original replicas annotation already exists")
 		return nil
 	}
 
 	originalTargetResourceReplicas := c.GetReplicasCount(ctx, targetResource)
 	if originalTargetResourceReplicas == nil {
-		return fmt.Errorf("failed to get original replicas count for target resource is not supported")
+		return fmt.Errorf("failed to get original replicas count for target resource")
 	}
 
-	targetResource.SetAnnotations(map[string]string{annotationKeyOriginalReplicas: strconv.Itoa(*originalTargetResourceReplicas)})
+	annotations[annotationKeyOriginalReplicas] = strconv.Itoa(int(*originalTargetResourceReplicas))
+	targetResourceObject.SetAnnotations(annotations)
 
-	if err := c.Update(ctx, targetResource); err != nil {
+	if err := c.Update(ctx, targetResourceObject); err != nil {
 		return fmt.Errorf("failed to update target resource original replicas annotation: %w", err)
 	}
 
