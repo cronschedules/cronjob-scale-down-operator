@@ -47,14 +47,6 @@ func scaleDown(ctx context.Context, c *K8sClient, targetRef TargetObject) error 
 	return nil
 }
 
-//lint:ignore U1000 Ignore unused function
-func scaleUp(ctx context.Context, targetRef TargetObject) error {
-
-	logger := log.FromContext(ctx)
-	logger.Info("Scaling up the target resource", "targetRef", targetRef)
-	// TODO: Implement the logic to scale up the target resource
-	return nil
-}
 func (c *K8sClient) ScaleDownTargetResource(ctx context.Context, targetRef TargetObject) error {
 	logger := log.FromContext(ctx)
 
