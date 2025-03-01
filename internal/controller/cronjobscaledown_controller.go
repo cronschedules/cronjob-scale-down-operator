@@ -80,7 +80,7 @@ func (r *CronJobScaleDownReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	logger.Info("Next execution time", nextExecutionTime)
 	// If the next execution time is in the past, scale down the target resource
 	if nextExecutionTime.Before(time.Now().In(location)) {
-		logger.Info("Starting to scale down the target resource")
+		logger.Info("Next execution time is in the past, scaling down the target resource")
 		err := k8sClient.ScaleDownTargetResource(ctx, utils.TargetObject{TargetRef: cronJobScaleDown.Spec.TargetRef})
 		if err != nil {
 			logger.Error(err, "Error scaling down target resource")
