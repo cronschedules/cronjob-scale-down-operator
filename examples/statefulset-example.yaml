@@ -1,0 +1,54 @@
+apiVersion: cronschedules.elbazi.co/v1
+kind: CronJobScaleDown
+metadata:
+  name: postgres-statefulset-scaler
+  namespace: default
+spec:
+  targetRef:
+    name: postgres-test
+    namespace: default
+    kind: StatefulSet
+    apiVersion: apps/v1
+  # Scale down at 11 PM daily (after business hours)
+  scaleDownSchedule: "0 23 * * *"
+  # Scale up at 5 AM daily (before business hours)
+  scaleUpSchedule: "0 5 * * *"
+  timeZone: "UTC"
+
+---
+# Example StatefulSet to test with
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres-test
+  namespace: default
+spec:
+  serviceName: postgres-test
+  replicas: 2
+  selector:
+    matchLabels:
+      app: postgres-test
+  template:
+    metadata:
+      labels:
+        app: postgres-test
+    spec:
+      containers:
+      - name: postgres
+        image: postgres:13
+        env:
+        - name: POSTGRES_PASSWORD
+          value: "testpassword"
+        ports:
+        - containerPort: 5432
+        volumeMounts:
+        - name: postgres-storage
+          mountPath: /var/lib/postgresql/data
+  volumeClaimTemplates:
+  - metadata:
+      name: postgres-storage
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      resources:
+        requests:
+          storage: 1Gi

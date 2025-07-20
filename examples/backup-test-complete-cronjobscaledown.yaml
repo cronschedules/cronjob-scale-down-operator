@@ -1,0 +1,14 @@
+apiVersion: cronschedules.elbazi.co/v1
+kind: CronJobScaleDown
+metadata:
+  name: nginx-test-scaler
+  namespace: default
+spec:
+  scaleDownSchedule: "*/30 * * * * *"  # Scale down every 30 seconds
+  scaleUpSchedule: "*/45 * * * * *"    # Scale up every 45 seconds
+  targetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: nginx-test
+    namespace: default
+  timeZone: UTC

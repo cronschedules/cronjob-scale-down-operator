@@ -1,0 +1,16 @@
+apiVersion: cronschedules.elbazi.co/v1
+kind: CronJobScaleDown
+metadata:
+  name: nginx-test-scaler
+  namespace: default
+spec:
+  targetRef:
+    name: nginx-test
+    namespace: default
+    kind: Deployment
+    apiVersion: apps/v1
+  # Scale down at second 0 of every minute (should trigger immediately if we're past second 0)
+  scaleDownSchedule: "0 * * * * *"
+  # Don't scale up for now, just test scale down
+  # scaleUpSchedule: "*/15 * * * * *"
+  timeZone: "UTC"

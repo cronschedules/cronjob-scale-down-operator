@@ -1,0 +1,54 @@
+# Multi-timezone examples
+---
+apiVersion: cronschedules.elbazi.co/v1
+kind: CronJobScaleDown
+metadata:
+  name: nginx-us-east
+  namespace: default
+spec:
+  targetRef:
+    name: nginx-test-us
+    namespace: default
+    kind: Deployment
+    apiVersion: apps/v1
+  # Scale down at 10 PM EST
+  scaleDownSchedule: "0 22 * * *"
+  # Scale up at 6 AM EST
+  scaleUpSchedule: "0 6 * * *"
+  timeZone: "America/New_York"
+
+---
+apiVersion: cronschedules.elbazi.co/v1
+kind: CronJobScaleDown
+metadata:
+  name: nginx-europe
+  namespace: default
+spec:
+  targetRef:
+    name: nginx-test-eu
+    namespace: default
+    kind: Deployment
+    apiVersion: apps/v1
+  # Scale down at 10 PM CET
+  scaleDownSchedule: "0 22 * * *"
+  # Scale up at 6 AM CET
+  scaleUpSchedule: "0 6 * * *"
+  timeZone: "Europe/Berlin"
+
+---
+apiVersion: cronschedules.elbazi.co/v1
+kind: CronJobScaleDown
+metadata:
+  name: nginx-asia
+  namespace: default
+spec:
+  targetRef:
+    name: nginx-test-asia
+    namespace: default
+    kind: Deployment
+    apiVersion: apps/v1
+  # Scale down at 10 PM JST
+  scaleDownSchedule: "0 22 * * *"
+  # Scale up at 6 AM JST
+  scaleUpSchedule: "0 6 * * *"
+  timeZone: "Asia/Tokyo"
