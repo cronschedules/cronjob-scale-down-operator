@@ -51,10 +51,14 @@ spec:
                 description: Target resource to scale (Deployment/StatefulSet)
                 properties:
                   apiVersion:
+                    default: apps/v1
                     description: ApiVersion of the target resource
                     type: string
                   kind:
                     description: Kind of the target resource (Deployment, StatefulSet)
+                    enum:
+                    - Deployment
+                    - StatefulSet
                     type: string
                   name:
                     description: Name of the target resource
@@ -69,12 +73,12 @@ spec:
                 - namespace
                 type: object
               timeZone:
-                description: 'Optional: Timezone (e.g., "America/New_York")'
+                default: UTC
+                description: Timezone (e.g., "America/New_York", "UTC")
                 type: string
             required:
-            - scaleDownSchedule
-            - scaleUpSchedule
             - targetRef
+            - timeZone
             type: object
           status:
             description: CronJobScaleDownStatus defines the observed state of CronJobScaleDown.

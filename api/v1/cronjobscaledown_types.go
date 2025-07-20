@@ -23,26 +23,37 @@ import (
 // CronJobScaleDownSpec defines the desired state of CronJobScaleDown.
 type CronJobScaleDownSpec struct {
 	// Target resource to scale (Deployment/StatefulSet)
+	// +kubebuilder:validation:Required
 	TargetRef TargetRef `json:"targetRef"`
 
 	// Cron schedule for scaling down (e.g., "0 22 * * *" for 10 PM daily)
-	ScaleDownSchedule string `json:"scaleDownSchedule"`
+	// +kubebuilder:validation:Optional
+	ScaleDownSchedule string `json:"scaleDownSchedule,omitempty"`
 
 	// Cron schedule for scaling back up (e.g., "0 6 * * *" for 6 AM daily)
-	ScaleUpSchedule string `json:"scaleUpSchedule"`
+	// +kubebuilder:validation:Optional
+	ScaleUpSchedule string `json:"scaleUpSchedule,omitempty"`
 
-	// Optional: Timezone (e.g., "America/New_York")
-	TimeZone string `json:"timeZone,omitempty"`
+	// Timezone (e.g., "America/New_York", "UTC")
+	// +kubebuilder:validation:Required
+	// +kubebuilder:default:="UTC"
+	TimeZone string `json:"timeZone"`
 }
 
 type TargetRef struct {
 	// Name of the target resource
+	// +kubebuilder:validation:Required
 	Name string `json:"name"`
 	// Namespace of the target resource
+	// +kubebuilder:validation:Required
 	Namespace string `json:"namespace"`
 	// Kind of the target resource (Deployment, StatefulSet)
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:Enum=Deployment;StatefulSet
 	Kind string `json:"kind"`
 	// ApiVersion of the target resource
+	// +kubebuilder:validation:Required
+	// +kubebuilder:default:="apps/v1"
 	ApiVersion string `json:"apiVersion"`
 }
 
