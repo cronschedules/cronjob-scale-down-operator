@@ -1,0 +1,88 @@
+# Alternative namespace-scoped RBAC configuration
+# This provides a more restrictive approach where the operator
+# only has permissions within specific namespaces rather than cluster-wide
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: cronjob-scale-down-operator-role
+  namespace: default  # Change this to your target namespace
+rules:
+# Permissions for managing deployments and statefulsets within namespace
+- apiGroups:
+  - apps
+  resources:
+  - deployments
+  - statefulsets
+  verbs:
+  - get      # Required to read current state and replica counts
+  - list     # Required for controller reconciliation
+  - watch    # Required for controller event handling
+  - update   # Required to modify replica counts for scaling
+  - patch    # Required for efficient updates with annotations
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: cronjob-scale-down-operator-rolebinding
+  namespace: default  # Change this to your target namespace
+subjects:
+- kind: ServiceAccount
+  name: controller-manager
+  namespace: cronjob-scale-down-operator-system
+roleRef:
+  kind: Role
+  name: cronjob-scale-down-operator-role
+  apiGroup: rbac.authorization.k8s.io
+
+---
+# Note: CronJobScaleDown CRD permissions still need to be cluster-scoped
+# since CRDs are cluster-scoped resources. This ClusterRole provides
+# minimal permissions for CRD operations.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: cronjob-scale-down-operator-crd-role
+rules:
+- apiGroups:
+  - cronschedules.elbazi.co
+  resources:
+  - cronjobscaledowns
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - cronschedules.elbazi.co
+  resources:
+  - cronjobscaledowns/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - cronschedules.elbazi.co
+  resources:
+  - cronjobscaledowns/status
+  verbs:
+  - get
+  - patch
+  - update
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: cronjob-scale-down-operator-crd-rolebinding
+subjects:
+- kind: ServiceAccount
+  name: controller-manager
+  namespace: cronjob-scale-down-operator-system
+roleRef:
+  kind: ClusterRole
+  name: cronjob-scale-down-operator-crd-role
+  apiGroup: rbac.authorization.k8s.io

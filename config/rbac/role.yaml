@@ -4,17 +4,20 @@ kind: ClusterRole
 metadata:
   name: manager-role
 rules:
+# Permissions for managing deployments and statefulsets
+# These are required to read current replica counts and update them for scaling
 - apiGroups:
   - apps
   resources:
   - deployments
   - statefulsets
   verbs:
-  - get
-  - list
-  - watch
-  - update
-  - patch
+  - get      # Required to read current state and replica counts
+  - list     # Required for controller reconciliation
+  - watch    # Required for controller event handling
+  - update   # Required to modify replica counts for scaling
+  - patch    # Required for efficient updates with annotations
+# Permissions for managing CronJobScaleDown custom resources
 - apiGroups:
   - cronschedules.elbazi.co
   resources:
@@ -27,12 +30,14 @@ rules:
   - patch
   - update
   - watch
+# Permission to update finalizers for proper cleanup
 - apiGroups:
   - cronschedules.elbazi.co
   resources:
   - cronjobscaledowns/finalizers
   verbs:
   - update
+# Permission to update status subresource
 - apiGroups:
   - cronschedules.elbazi.co
   resources:
