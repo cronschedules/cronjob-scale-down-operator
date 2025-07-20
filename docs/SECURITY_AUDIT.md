@@ -113,5 +113,5 @@ The operator now complies with:
 For questions about this security audit or to report new vulnerabilities, please refer to the SECURITY.md file in the repository.
 
 ---
-*Security Audit conducted on: January 2025*
-*Next recommended audit: April 2025*
+*Security Audit conducted on: July 2025*
+*Next recommended audit: October 2025*
