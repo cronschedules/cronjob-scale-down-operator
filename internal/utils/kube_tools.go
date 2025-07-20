@@ -209,19 +209,16 @@ func (c *K8sClient) UpdateTargetResourceOriginalReplicasAnnotation(ctx context.C
 func (c *K8sClient) ScaleUpTargetResource(ctx context.Context, targetRef TargetObject) error {
 	logger := log.FromContext(ctx)
 
-	var (
-		obj  client.Object
-		kind string = targetRef.Kind
-	)
+	var obj client.Object
 
-	switch kind {
+	switch targetRef.Kind {
 	case DeploymentKind:
 		obj = &appsv1.Deployment{}
 	case StatefulSetKind:
 		obj = &appsv1.StatefulSet{}
 	default:
-		logger.Error(nil, "Unsupported target resource kind for scale up", "kind", kind)
-		return fmt.Errorf("unsupported target resource kind: %s", kind)
+		logger.Error(nil, "Unsupported target resource kind for scale up", "kind", targetRef.Kind)
+		return fmt.Errorf("unsupported target resource kind: %s", targetRef.Kind)
 	}
 
 	if err := c.Get(ctx, client.ObjectKey{Name: targetRef.Name, Namespace: targetRef.Namespace}, obj); err != nil {
