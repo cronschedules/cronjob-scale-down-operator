@@ -6,4 +6,11 @@ metadata:
     app.kubernetes.io/managed-by: kustomize
   name: cronjobscaledown-sample
 spec:
-  # TODO(user): Add fields here
+  targetRef:
+    name: my-deployment
+    namespace: default
+    kind: Deployment
+    apiVersion: apps/v1
+  scaleDownSchedule: "0 22 * * *"  # Scale down at 10 PM daily
+  scaleUpSchedule: "0 6 * * *"     # Scale up at 6 AM daily
+  timeZone: "UTC"

@@ -59,10 +59,14 @@ spec:
                 description: Target resource to scale (Deployment/StatefulSet)
                 properties:
                   apiVersion:
+                    default: apps/v1
                     description: ApiVersion of the target resource
                     type: string
                   kind:
                     description: Kind of the target resource (Deployment, StatefulSet)
+                    enum:
+                    - Deployment
+                    - StatefulSet
                     type: string
                   name:
                     description: Name of the target resource
@@ -77,12 +81,12 @@ spec:
                 - namespace
                 type: object
               timeZone:
-                description: 'Optional: Timezone (e.g., "America/New_York")'
+                default: UTC
+                description: Timezone (e.g., "America/New_York", "UTC")
                 type: string
             required:
-            - scaleDownSchedule
-            - scaleUpSchedule
             - targetRef
+            - timeZone
             type: object
           status:
             description: CronJobScaleDownStatus defines the observed state of CronJobScaleDown.
@@ -130,14 +134,14 @@ rules:
   - ""
   resources:
   - configmaps
-  - deployments
-  - statefulsets
   verbs:
   - get
   - list
   - watch
+  - create
   - update
   - patch
+  - delete
 - apiGroups:
   - coordination.k8s.io
   resources:
@@ -235,6 +239,17 @@ metadata:
   name: cronjob-scale-down-operator-manager-role
 rules:
 - apiGroups:
+  - apps
+  resources:
+  - deployments
+  - statefulsets
+  verbs:
+  - get
+  - list
+  - watch
+  - update
+  - patch
+- apiGroups:
   - cronschedules.elbazi.co
   resources:
   - cronjobscaledowns
@@ -246,17 +261,6 @@ rules:
   - patch
   - update
   - watch
-- apiGroups:
-  - apps
-  resources:
-  - deployments
-  - statefulsets
-  verbs:
-  - get
-  - list
-  - watch
-  - update
-  - patch
 - apiGroups:
   - cronschedules.elbazi.co
   resources:
@@ -299,17 +303,6 @@ rules:
   - /metrics
   verbs:
   - get
-- apiGroups:
-  - apps
-  resources:
-  - deployments
-  - statefulsets
-  verbs:
-  - get
-  - list
-  - watch
-  - update
-  - patch
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
@@ -406,7 +399,7 @@ spec:
         - --health-probe-bind-address=:8081
         command:
         - /manager
-        image: controller:latest
+        image: ghcr.io/z4ck404/cronjob-scale-down-operator:latest
         livenessProbe:
           httpGet:
             path: /healthz
