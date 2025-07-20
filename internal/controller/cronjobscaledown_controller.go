@@ -150,7 +150,7 @@ func (r *CronJobScaleDownReconciler) executeScaling(ctx context.Context, k8sClie
 		"lastScaleDownTime", cronJobScaleDown.Status.LastScaleDownTime.Time.Format(time.RFC3339),
 		"lastScaleUpTime", cronJobScaleDown.Status.LastScaleUpTime.Time.Format(time.RFC3339))
 
-	if r.shouldScaleDown(cronJobScaleDown, now, scaleDownNext) {
+	if r.shouldScaleDown(cronJobScaleDown, now) {
 		logger.Info("Scaling down the target resource")
 		if err := k8sClient.ScaleDownTargetResource(ctx, utils.TargetObject{TargetRef: cronJobScaleDown.Spec.TargetRef}); err != nil {
 			logger.Error(err, "Error scaling down target resource")
@@ -161,7 +161,7 @@ func (r *CronJobScaleDownReconciler) executeScaling(ctx context.Context, k8sClie
 		didScale = true
 	}
 
-	if r.shouldScaleUp(cronJobScaleDown, now, scaleUpNext) {
+	if r.shouldScaleUp(cronJobScaleDown, now) {
 		logger.Info("Scaling up the target resource")
 		if err := k8sClient.ScaleUpTargetResource(ctx, utils.TargetObject{TargetRef: cronJobScaleDown.Spec.TargetRef}); err != nil {
 			logger.Error(err, "Error scaling up target resource")
@@ -175,7 +175,7 @@ func (r *CronJobScaleDownReconciler) executeScaling(ctx context.Context, k8sClie
 	return didScale, nil
 }
 
-func (r *CronJobScaleDownReconciler) shouldScaleDown(cronJobScaleDown *cronschedulesv1.CronJobScaleDown, now, scaleDownNext time.Time) bool {
+func (r *CronJobScaleDownReconciler) shouldScaleDown(cronJobScaleDown *cronschedulesv1.CronJobScaleDown, now time.Time) bool {
 	return r.shouldExecuteNow(
 		cronJobScaleDown.Spec.ScaleDownSchedule,
 		now,
@@ -183,7 +183,7 @@ func (r *CronJobScaleDownReconciler) shouldScaleDown(cronJobScaleDown *cronsched
 	)
 }
 
-func (r *CronJobScaleDownReconciler) shouldScaleUp(cronJobScaleDown *cronschedulesv1.CronJobScaleDown, now, scaleUpNext time.Time) bool {
+func (r *CronJobScaleDownReconciler) shouldScaleUp(cronJobScaleDown *cronschedulesv1.CronJobScaleDown, now time.Time) bool {
 	return r.shouldExecuteNow(
 		cronJobScaleDown.Spec.ScaleUpSchedule,
 		now,
