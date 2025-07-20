@@ -244,14 +244,14 @@ func (c *K8sClient) ScaleUpTargetResource(ctx context.Context, targetRef TargetO
 
 	switch o := obj.(type) {
 	case *appsv1.Deployment:
-		o.Spec.Replicas = int32Ptr(int32(originalReplicas))
+		o.Spec.Replicas = ptr.To[int32](int32(originalReplicas))
 		if err := c.Update(ctx, o); err != nil {
 			logger.Error(err, "Failed to scale up deployment", "name", o.GetName())
 			return err
 		}
 		logger.Info("Scaled up deployment", "name", o.GetName(), "replicas", originalReplicas)
 	case *appsv1.StatefulSet:
-		o.Spec.Replicas = int32Ptr(int32(originalReplicas))
+		o.Spec.Replicas = ptr.To[int32](int32(originalReplicas))
 		if err := c.Update(ctx, o); err != nil {
 			logger.Error(err, "Failed to scale up statefulset", "name", o.GetName())
 			return err
