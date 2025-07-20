@@ -22,6 +22,36 @@ A Kubernetes operator that automatically scales down Deployments and StatefulSet
 
 ### Installation
 
+#### Option 1: Using Helm (Recommended)
+
+1. **Install using Helm:**
+   ```bash
+   # Clone the repository
+   git clone https://github.com/z4ck404/cronjob-scale-down-operator.git
+   cd cronjob-scale-down-operator
+   
+   # Install the operator
+   helm install cronjob-scale-down-operator ./charts/cronjob-scale-down-operator
+   ```
+
+2. **Verify installation:**
+   ```bash
+   kubectl get pods -l app.kubernetes.io/name=cronjob-scale-down-operator
+   ```
+
+#### Option 2: Using Container Image
+
+The operator is available as a pre-built container image:
+
+```bash
+# Image available at:
+docker pull ghcr.io/z4ck404/cronjob-scale-down-operator:0.1.2
+```
+
+Use this image in your custom deployments or with the provided Helm chart.
+
+#### Option 3: Using kubectl
+
 1. **Install the CRDs and operator:**
    ```bash
    kubectl apply -f config/crd/bases/
@@ -29,17 +59,19 @@ A Kubernetes operator that automatically scales down Deployments and StatefulSet
    kubectl apply -f config/manager/
    ```
 
-2. **Create a test deployment:**
+#### Quick Test
+
+1. **Create a test deployment:**
    ```bash
    kubectl apply -f examples/test-deployment.yaml
    ```
 
-3. **Apply a scaling schedule:**
+2. **Apply a scaling schedule:**
    ```bash
    kubectl apply -f examples/quick-test.yaml
    ```
 
-4. **Monitor the scaling:**
+3. **Monitor the scaling:**
    ```bash
    kubectl get cronjobscaledown -w
    kubectl get deployment nginx-test -w

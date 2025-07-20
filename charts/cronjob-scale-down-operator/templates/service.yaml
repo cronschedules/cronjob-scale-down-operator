@@ -1,0 +1,19 @@
+{{- if .Values.metrics.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "cronjob-scale-down-operator.fullname" . }}-metrics-service
+  labels:
+    {{- include "cronjob-scale-down-operator.labels" . | nindent 4 }}
+    control-plane: controller-manager
+spec:
+  type: {{ .Values.metrics.service.type }}
+  ports:
+  - name: https
+    port: {{ .Values.metrics.service.port }}
+    protocol: TCP
+    targetPort: 8080
+  selector:
+    {{- include "cronjob-scale-down-operator.selectorLabels" . | nindent 4 }}
+    control-plane: controller-manager
+{{- end }}

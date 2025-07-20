@@ -1,0 +1,18 @@
+apiVersion: v2
+name: cronjob-scale-down-operator
+description: A Kubernetes operator that automatically scales down Deployments and StatefulSets during specific time windows to save resources and costs
+type: application
+version: 0.1.2
+appVersion: "0.1.2"
+keywords:
+  - kubernetes
+  - operator
+  - scaling
+  - cron
+  - cost-optimization
+home: https://github.com/z4ck404/cronjob-scale-down-operator
+sources:
+  - https://github.com/z4ck404/cronjob-scale-down-operator
+maintainers:
+  - name: z4ck404
+    url: https://github.com/z4ck404
