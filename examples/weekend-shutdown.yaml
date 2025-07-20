@@ -10,7 +10,7 @@ spec:
     kind: Deployment
     apiVersion: apps/v1
   # Scale down on Friday at 6 PM
-  scaleDownSchedule: "0 18 * * 5"
+  scaleDownSchedule: "0 0 18 * * 5"
   # Scale up on Monday at 8 AM
-  scaleUpSchedule: "0 8 * * 1"
+  scaleUpSchedule: "0 0 8 * * 1"
   timeZone: "UTC"
