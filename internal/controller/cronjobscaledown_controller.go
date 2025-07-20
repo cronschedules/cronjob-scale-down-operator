@@ -133,10 +133,10 @@ func (r *CronJobScaleDownReconciler) shouldExecuteNow(schedule string, now time.
 
 	// For schedules like "*/30 * * * * *", check if current second matches the pattern
 	// This is a simple check for seconds-based schedules
-	if schedule == "*/30 * * * * *" {
+	if schedule == ScheduleEvery30Seconds {
 		return now.Second()%30 == 0 && (lastExecutionTime.IsZero() || now.Sub(lastExecutionTime) >= 25*time.Second)
 	}
-	if schedule == "*/45 * * * * *" {
+	if schedule == ScheduleEvery45Seconds {
 		return now.Second()%45 == 0 && (lastExecutionTime.IsZero() || now.Sub(lastExecutionTime) >= 40*time.Second)
 	}
 
