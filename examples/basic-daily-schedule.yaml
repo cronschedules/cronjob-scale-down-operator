@@ -1,0 +1,16 @@
+apiVersion: cronschedules.elbazi.co/v1
+kind: CronJobScaleDown
+metadata:
+  name: nginx-basic-schedule
+  namespace: default
+spec:
+  targetRef:
+    name: nginx-test
+    namespace: default
+    kind: Deployment
+    apiVersion: apps/v1
+  # Scale down at 10 PM daily
+  scaleDownSchedule: "0 22 * * *"
+  # Scale up at 6 AM daily  
+  scaleUpSchedule: "0 6 * * *"
+  timeZone: "UTC"
