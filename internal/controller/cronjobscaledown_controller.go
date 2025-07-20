@@ -125,7 +125,8 @@ func (r *CronJobScaleDownReconciler) shouldExecuteNow(schedule string, now time.
 		return false
 	}
 
-	cronSchedule, err := r.parser.Parse(schedule)
+	parser := cron.NewParser(cron.Second | cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow)
+	cronSchedule, err := parser.Parse(schedule)
 	if err != nil {
 		return false
 	}
