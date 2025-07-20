@@ -242,9 +242,24 @@ func (c *K8sClient) ScaleUpTargetResource(ctx context.Context, targetRef TargetO
 		return err
 	}
 
-	if err := c.updateReplicas(ctx, obj, int32(originalReplicas)); err != nil {
-		logger.Error(err, "Failed to scale up target resource", "kind", targetRef.Kind, "name", targetRef.Name)
-		return err
+	switch o := obj.(type) {
+	case *appsv1.Deployment:
+		o.Spec.Replicas = ptr.To[int32](int32(originalReplicas))
+		if err := c.Update(ctx, o); err != nil {
+			logger.Error(err, "Failed to scale up deployment", "name", o.GetName())
+			return err
+		}
+		logger.Info("Successfully scaled up deployment", "name", o.GetName(), "replicas", originalReplicas)
+	case *appsv1.StatefulSet:
+		o.Spec.Replicas = ptr.To[int32](int32(originalReplicas))
+		if err := c.Update(ctx, o); err != nil {
+			logger.Error(err, "Failed to scale up statefulset", "name", o.GetName())
+			return err
+		}
+		logger.Info("Successfully scaled up statefulset", "name", o.GetName(), "replicas", originalReplicas)
+	default:
+		logger.Error(nil, "Unsupported resource type for scaling", "type", fmt.Sprintf("%T", obj))
+		return fmt.Errorf("unsupported resource type: %T", obj)
 	}
 
 	return nil
