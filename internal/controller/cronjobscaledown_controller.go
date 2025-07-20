@@ -19,6 +19,8 @@ package controller
 import (
 	"context"
 	"fmt"
+	"regexp"
+	"strings"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -31,6 +33,13 @@ import (
 
 	cronschedulesv1 "github.com/z4ck404/cronjob-scale-down-operator/api/v1"
 	"github.com/z4ck404/cronjob-scale-down-operator/internal/utils"
+)
+
+var (
+	// Valid timezone regex pattern - restricts to safe IANA timezone names
+	validTimezonePattern = regexp.MustCompile(`^[A-Za-z]+(?:[_/][A-Za-z0-9_+-]+)*$`)
+	// Maximum schedule length to prevent extremely long schedules
+	maxScheduleLength = 100
 )
 
 // CronJobScaleDownReconciler reconciles a CronJobScaleDown object
@@ -64,9 +73,113 @@ func (r *CronJobScaleDownReconciler) validateSpec(cronJobScaleDown *cronschedule
 	if cronJobScaleDown.Spec.ScaleDownSchedule == "" && cronJobScaleDown.Spec.ScaleUpSchedule == "" {
 		return fmt.Errorf("both ScaleDownSchedule and ScaleUpSchedule are empty")
 	}
+
+	// Validate schedule lengths
+	if len(cronJobScaleDown.Spec.ScaleDownSchedule) > maxScheduleLength {
+		return fmt.Errorf("ScaleDownSchedule exceeds maximum length of %d characters", maxScheduleLength)
+	}
+	if len(cronJobScaleDown.Spec.ScaleUpSchedule) > maxScheduleLength {
+		return fmt.Errorf("ScaleUpSchedule exceeds maximum length of %d characters", maxScheduleLength)
+	}
+
+	// Validate schedule format
+	if cronJobScaleDown.Spec.ScaleDownSchedule != "" {
+		if err := r.validateCronSchedule(cronJobScaleDown.Spec.ScaleDownSchedule); err != nil {
+			return fmt.Errorf("invalid ScaleDownSchedule: %w", err)
+		}
+	}
+	if cronJobScaleDown.Spec.ScaleUpSchedule != "" {
+		if err := r.validateCronSchedule(cronJobScaleDown.Spec.ScaleUpSchedule); err != nil {
+			return fmt.Errorf("invalid ScaleUpSchedule: %w", err)
+		}
+	}
+
+	// Validate timezone
 	if cronJobScaleDown.Spec.TimeZone == "" {
 		return fmt.Errorf("TimeZone is empty")
 	}
+	if err := r.validateTimezone(cronJobScaleDown.Spec.TimeZone); err != nil {
+		return fmt.Errorf("invalid TimeZone: %w", err)
+	}
+
+	// Validate target reference
+	if err := r.validateTargetRef(&cronJobScaleDown.Spec.TargetRef); err != nil {
+		return fmt.Errorf("invalid TargetRef: %w", err)
+	}
+
+	return nil
+}
+
+func (r *CronJobScaleDownReconciler) validateCronSchedule(schedule string) error {
+	// Sanitize schedule - remove potentially dangerous characters
+	schedule = strings.TrimSpace(schedule)
+	if schedule == "" {
+		return fmt.Errorf("schedule cannot be empty after trimming")
+	}
+
+	// Check for potentially dangerous patterns
+	if strings.Contains(schedule, "..") || strings.Contains(schedule, "//") {
+		return fmt.Errorf("schedule contains potentially dangerous patterns")
+	}
+
+	// Validate using cron parser
+	parser := cron.NewParser(cron.Second | cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow)
+	_, err := parser.Parse(schedule)
+	if err != nil {
+		return fmt.Errorf("invalid cron expression: %w", err)
+	}
+
+	return nil
+}
+
+func (r *CronJobScaleDownReconciler) validateTimezone(timezone string) error {
+	// Sanitize timezone
+	timezone = strings.TrimSpace(timezone)
+	if timezone == "" {
+		return fmt.Errorf("timezone cannot be empty after trimming")
+	}
+
+	// Validate timezone format using regex
+	if !validTimezonePattern.MatchString(timezone) {
+		return fmt.Errorf("timezone contains invalid characters")
+	}
+
+	// Test if timezone can be loaded
+	_, err := time.LoadLocation(timezone)
+	if err != nil {
+		return fmt.Errorf("invalid timezone: %w", err)
+	}
+
+	return nil
+}
+
+func (r *CronJobScaleDownReconciler) validateTargetRef(targetRef *cronschedulesv1.TargetRef) error {
+	if targetRef.Name == "" {
+		return fmt.Errorf("target name cannot be empty")
+	}
+	if targetRef.Namespace == "" {
+		return fmt.Errorf("target namespace cannot be empty")
+	}
+	if targetRef.Kind == "" {
+		return fmt.Errorf("target kind cannot be empty")
+	}
+	if targetRef.ApiVersion == "" {
+		return fmt.Errorf("target apiVersion cannot be empty")
+	}
+
+	// Validate supported resource kinds
+	switch targetRef.Kind {
+	case utils.DeploymentKind, utils.StatefulSetKind:
+		// Valid kinds
+	default:
+		return fmt.Errorf("unsupported target kind: %s", targetRef.Kind)
+	}
+
+	// Validate API version
+	if targetRef.ApiVersion != "apps/v1" {
+		return fmt.Errorf("unsupported API version: %s", targetRef.ApiVersion)
+	}
+
 	return nil
 }
 
