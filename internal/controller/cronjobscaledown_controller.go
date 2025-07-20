@@ -54,7 +54,7 @@ func (r *CronJobScaleDownReconciler) Reconcile(ctx context.Context, req ctrl.Req
 
 	if err := r.validateSpec(cronJobScaleDown); err != nil {
 		logger.Error(err, "Spec validation failed")
-		return ctrl.Result{}, nil
+		return ctrl.Result{RequeueAfter: time.Minute}, nil
 	}
 
 	return r.processSchedules(ctx, cronJobScaleDown)
