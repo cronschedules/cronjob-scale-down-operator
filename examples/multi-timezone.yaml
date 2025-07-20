@@ -12,9 +12,9 @@ spec:
     kind: Deployment
     apiVersion: apps/v1
   # Scale down at 10 PM EST
-  scaleDownSchedule: "0 22 * * *"
+  scaleDownSchedule: "0 0 22 * * *"
   # Scale up at 6 AM EST
-  scaleUpSchedule: "0 6 * * *"
+  scaleUpSchedule: "0 0 6 * * *"
   timeZone: "America/New_York"
 
 ---
@@ -30,9 +30,9 @@ spec:
     kind: Deployment
     apiVersion: apps/v1
   # Scale down at 10 PM CET
-  scaleDownSchedule: "0 22 * * *"
+  scaleDownSchedule: "0 0 22 * * *"
   # Scale up at 6 AM CET
-  scaleUpSchedule: "0 6 * * *"
+  scaleUpSchedule: "0 0 6 * * *"
   timeZone: "Europe/Berlin"
 
 ---
@@ -48,7 +48,7 @@ spec:
     kind: Deployment
     apiVersion: apps/v1
   # Scale down at 10 PM JST
-  scaleDownSchedule: "0 22 * * *"
+  scaleDownSchedule: "0 0 22 * * *"
   # Scale up at 6 AM JST
-  scaleUpSchedule: "0 6 * * *"
+  scaleUpSchedule: "0 0 6 * * *"
   timeZone: "Asia/Tokyo"

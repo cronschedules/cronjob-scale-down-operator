@@ -77,10 +77,10 @@ spec:
     apiVersion: apps/v1
   
   # When to scale down (cron format with seconds)
-  scaleDownSchedule: "0 22 * * *"  # 10 PM daily
+  scaleDownSchedule: "0 0 22 * * *"  # 10 PM daily
   
   # When to scale up (optional)
-  scaleUpSchedule: "0 6 * * *"     # 6 AM daily
+  scaleUpSchedule: "0 0 6 * * *"     # 6 AM daily
   
   # Timezone for schedule interpretation
   timeZone: "UTC"  # or "America/New_York", "Europe/London", etc.
@@ -105,10 +105,10 @@ The operator supports 6-field cron expressions with second precision:
 
 | Schedule | Description |
 |----------|-------------|
-| `"0 22 * * *"` | Every day at 10:00 PM |
-| `"0 6 * * 1-5"` | Weekdays at 6:00 AM |
-| `"0 18 * * 5"` | Every Friday at 6:00 PM |
-| `"0 0 * * 0"` | Every Sunday at midnight |
+| `"0 0 22 * * *"` | Every day at 10:00 PM |
+| `"0 0 6 * * 1-5"` | Weekdays at 6:00 AM |
+| `"0 0 18 * * 5"` | Every Friday at 6:00 PM |
+| `"0 0 0 * * 0"` | Every Sunday at midnight |
 | `"*/30 * * * * *"` | Every 30 seconds (testing) |
 
 ### Supported Timezones

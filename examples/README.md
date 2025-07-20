@@ -47,9 +47,9 @@ The operator supports cron expressions with seconds precision:
 
 ### Common Schedule Examples
 
-- `"0 22 * * *"` - Every day at 10:00 PM
-- `"0 6 * * *"` - Every day at 6:00 AM  
-- `"0 0 * * 0"` - Every Sunday at midnight
+- `"0 0 22 * * *"` - Every day at 10:00 PM
+- `"0 0 6 * * *"` - Every day at 6:00 AM  
+- `"0 0 0 * * 0"` - Every Sunday at midnight
 - `"*/30 * * * * *"` - Every 30 seconds (testing)
-- `"0 18 * * 1-5"` - Weekdays at 6:00 PM
-- `"0 8 * * 1-5"` - Weekdays at 8:00 AM
+- `"0 0 18 * * 1-5"` - Weekdays at 6:00 PM
+- `"0 0 8 * * 1-5"` - Weekdays at 8:00 AM

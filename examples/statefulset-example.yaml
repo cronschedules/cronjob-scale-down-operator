@@ -10,9 +10,9 @@ spec:
     kind: StatefulSet
     apiVersion: apps/v1
   # Scale down at 11 PM daily (after business hours)
-  scaleDownSchedule: "0 23 * * *"
+  scaleDownSchedule: "0 0 23 * * *"
   # Scale up at 5 AM daily (before business hours)
-  scaleUpSchedule: "0 5 * * *"
+  scaleUpSchedule: "0 0 5 * * *"
   timeZone: "UTC"
 
 ---
