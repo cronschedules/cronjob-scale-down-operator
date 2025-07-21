@@ -80,7 +80,7 @@ func (s *Server) getCronJobs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var statuses []CronJobStatus
+	statuses := make([]CronJobStatus, 0, len(cronJobList.Items))
 	for _, cronJob := range cronJobList.Items {
 		status, err := s.buildCronJobStatus(ctx, &cronJob)
 		if err != nil {
@@ -91,7 +91,11 @@ func (s *Server) getCronJobs(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(statuses)
+	if err := json.NewEncoder(w).Encode(statuses); err != nil {
+		log.Error(err, "Failed to encode response")
+		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+		return
+	}
 }
 
 func (s *Server) getCronJob(w http.ResponseWriter, r *http.Request) {
@@ -117,7 +121,11 @@ func (s *Server) getCronJob(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(status)
+	if err := json.NewEncoder(w).Encode(status); err != nil {
+		log.Error(err, "Failed to encode response")
+		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+		return
+	}
 }
 
 func (s *Server) buildCronJobStatus(ctx context.Context, cronJob *cronschedulesv1.CronJobScaleDown) (*CronJobStatus, error) {
@@ -271,7 +279,10 @@ func (s *Server) serveUI(w http.ResponseWriter, r *http.Request) {
 </html>`
 
 	w.Header().Set("Content-Type", "text/html")
-	w.Write([]byte(html))
+	if _, err := w.Write([]byte(html)); err != nil {
+		log := log.Log.WithName("webui")
+		log.Error(err, "Failed to write response")
+	}
 }
 
 func (s *Server) Start(addr string) error {
