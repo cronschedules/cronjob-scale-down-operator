@@ -288,5 +288,9 @@ func (s *Server) serveUI(w http.ResponseWriter, r *http.Request) {
 func (s *Server) Start(addr string) error {
 	log := log.Log.WithName("webui")
 	log.Info("Starting web UI server", "address", addr)
-	return http.ListenAndServe(addr, s.router)
+	err := http.ListenAndServe(addr, s.router)
+	if err != nil {
+		log.Error(err, "Failed to start web UI server", "address", addr, "possible causes", "port conflict, insufficient permissions, or invalid address")
+	}
+	return err
 }
