@@ -6,6 +6,7 @@ godebug default=go1.23
 
 require (
 	github.com/go-logr/logr v1.4.2
+	github.com/gorilla/mux v1.8.1
 	github.com/onsi/ginkgo/v2 v2.21.0
 	github.com/onsi/gomega v1.35.1
 	github.com/robfig/cron/v3 v3.0.1
