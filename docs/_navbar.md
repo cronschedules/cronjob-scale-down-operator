@@ -1,0 +1,5 @@
+- [🏠 Home](/)
+- [🚀 Quick Start](README.md)
+- [🌐 Web UI](webui.md)
+- [📦 Installation](helm-installation.md)
+- [🔒 Security](SECURITY_AUDIT.md)

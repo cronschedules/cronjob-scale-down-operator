@@ -9,6 +9,7 @@ A Kubernetes operator that automatically scales down Deployments and StatefulSet
 - 📈 **Flexible Scaling**: Scale down and up on different schedules
 - 🎯 **Multiple Resource Types**: Supports Deployments and StatefulSets
 - 📊 **Status Tracking**: Monitor last execution times and current replica counts
+- 🌐 **Web UI Dashboard**: Built-in web interface to monitor all cron jobs and their status
 - ⚡ **Efficient**: Only reconciles when needed, with smart requeue timing
 
 ## Quick Start
@@ -202,6 +203,62 @@ Key Helm chart values:
 | `resources.requests.cpu` | CPU request | `10m` |
 | `metrics.enabled` | Enable metrics service | `true` |
 | `rbac.create` | Create RBAC resources | `true` |
+
+## Web UI Dashboard
+
+The operator includes a built-in web dashboard that provides real-time monitoring of all CronJobScaleDown resources and their target deployments/statefulsets.
+
+![Web UI Dashboard](./images/web-ui.png)
+
+### Accessing the Web UI
+
+By default, the web UI is available at `http://localhost:8082` when running the operator locally. In a Kubernetes cluster, you can access it by:
+
+1. **Port forwarding** (for development/testing):
+   ```bash
+   kubectl port-forward -n cronjob-scale-down-operator-system deployment/cronjob-scale-down-operator-controller-manager 8082:8082
+   ```
+   Then visit `http://localhost:8082`
+
+2. **Configure ingress** (for production):
+   ```yaml
+   apiVersion: networking.k8s.io/v1
+   kind: Ingress
+   metadata:
+     name: cronjob-scale-down-operator-ui
+   spec:
+     rules:
+     - host: cronjob-ui.example.com
+       http:
+         paths:
+         - path: /
+           pathType: Prefix
+           backend:
+             service:
+               name: cronjob-scale-down-operator-ui
+               port:
+                 number: 8082
+   ```
+
+### Web UI Features
+
+- 📊 **Real-time Dashboard**: Overview of all CronJobScaleDown resources
+- 📈 **Status Monitoring**: Current state of target deployments and statefulsets  
+- 🕒 **Schedule Information**: View scale-up/down schedules and timezones
+- 📋 **Replica Status**: Visual indicators for ready vs desired replicas
+- 📅 **Action History**: Timestamps of last scale operations
+- 🔄 **Auto-refresh**: Updates every 30 seconds automatically
+- 📱 **Responsive Design**: Works on desktop, tablet, and mobile
+
+### Customizing Web UI Port
+
+You can customize the web UI port using the `--webui-addr` flag:
+
+```bash
+./manager --webui-addr=:8080
+```
+
+For more details about the web UI, see the [Web UI Documentation](./webui.md).
 
 ## Monitoring
 

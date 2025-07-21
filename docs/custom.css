@@ -1,0 +1,70 @@
+/* Custom styles for CronJob Scale Down Operator docs */
+
+:root {
+  --theme-color: #0d6efd;
+  --theme-color-secondary: #6c757d;
+}
+
+/* Logo styling */
+.app-name img {
+  max-height: 32px;
+  margin-right: 8px;
+}
+
+/* Sidebar styling */
+.sidebar-nav > ul > li > p {
+  font-weight: 600;
+  color: var(--theme-color);
+  border-bottom: 1px solid #f0f0f0;
+  padding-bottom: 8px;
+  margin-bottom: 8px;
+}
+
+/* Code block improvements */
+pre[data-lang] {
+  border-radius: 6px;
+  border: 1px solid #e9ecef;
+}
+
+/* Image styling */
+.markdown-section img {
+  max-width: 100%;
+  border-radius: 8px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  margin: 16px 0;
+}
+
+/* Table improvements */
+.markdown-section table {
+  border-collapse: collapse;
+  margin: 16px 0;
+}
+
+.markdown-section table th,
+.markdown-section table td {
+  border: 1px solid #dee2e6;
+  padding: 8px 12px;
+}
+
+.markdown-section table th {
+  background-color: #f8f9fa;
+  font-weight: 600;
+}
+
+/* Navigation improvements */
+.app-nav {
+  background-color: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(8px);
+}
+
+/* Search box styling */
+.search .input-wrap input {
+  border-radius: 20px;
+  border: 1px solid #dee2e6;
+  padding: 8px 16px;
+}
+
+/* Badge styling for features */
+.markdown-section li strong {
+  color: var(--theme-color);
+}
