@@ -113,5 +113,6 @@ The operator now complies with:
 For questions about this security audit or to report new vulnerabilities, please refer to the SECURITY.md file in the repository.
 
 ---
-*Security Audit conducted on: July 2025*
+*Security Audit conducted by: @copilot on July 2025*
+*Associated PR: [🔐 Comprehensive Security Hardening: Fix Critical Vulnerabilities](https://github.com/Z4ck404/CronJob-Scale-Down-Operator/pull/XXX)*
 *Next recommended audit: October 2025*
