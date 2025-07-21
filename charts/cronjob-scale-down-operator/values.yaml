@@ -4,7 +4,7 @@ replicaCount: 1
 image:
   repository: ghcr.io/z4ck404/cronjob-scale-down-operator
   pullPolicy: IfNotPresent
-  tag: "0.1.2"
+  tag: "0.2.0"
 
 imagePullSecrets: []
 nameOverride: ""
@@ -83,3 +83,20 @@ rbac:
 # Leader election configuration
 leaderElection:
   enabled: true
+
+# Web UI configuration
+webui:
+  enabled: true
+  service:
+    type: ClusterIP
+    port: 8082
+  ingress:
+    enabled: false
+    className: ""
+    annotations: {}
+    hosts:
+      - host: cronjob-ui.local
+        paths:
+          - path: /
+            pathType: Prefix
+    tls: []

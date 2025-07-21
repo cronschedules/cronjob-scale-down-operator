@@ -39,6 +39,7 @@ import (
 
 	cronschedulesv1 "github.com/z4ck404/cronjob-scale-down-operator/api/v1"
 	"github.com/z4ck404/cronjob-scale-down-operator/internal/controller"
+	"github.com/z4ck404/cronjob-scale-down-operator/internal/webui"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -63,6 +64,7 @@ func main() {
 	var probeAddr string
 	var secureMetrics bool
 	var enableHTTP2 bool
+	var webuiAddr string
 	var tlsOpts []func(*tls.Config)
 	flag.StringVar(&metricsAddr, "metrics-bind-address", "0", "The address the metrics endpoint binds to. "+
 		"Use :8443 for HTTPS or :8080 for HTTP, or leave as 0 to disable the metrics service.")
@@ -81,6 +83,7 @@ func main() {
 	flag.StringVar(&metricsCertKey, "metrics-cert-key", "tls.key", "The name of the metrics server key file.")
 	flag.BoolVar(&enableHTTP2, "enable-http2", false,
 		"If set, HTTP/2 will be enabled for the metrics and webhook servers")
+	flag.StringVar(&webuiAddr, "webui-addr", ":8082", "The address the web UI binds to. Use :8443 for HTTPS or :8080 for HTTP.")
 	opts := zap.Options{
 		Development: true,
 	}
@@ -235,6 +238,15 @@ func main() {
 		setupLog.Error(err, "unable to set up ready check")
 		os.Exit(1)
 	}
+
+	// Start web UI server
+	webUIServer := webui.NewServer(mgr.GetClient())
+	go func() {
+		setupLog.Info("starting web UI server", "address", webuiAddr)
+		if err := webUIServer.Start(webuiAddr); err != nil {
+			setupLog.Error(err, "problem running web UI")
+		}
+	}()
 
 	setupLog.Info("starting manager")
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
