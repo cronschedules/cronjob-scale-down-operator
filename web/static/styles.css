@@ -502,9 +502,7 @@ body {
     }
 }
 
-.card {
-    animation: slideInUp 0.6s cubic-bezier(0.4, 0, 0.2, 1);
-}
+/* Removed duplicate .card animation rule */
 
 /* Stagger animation for multiple cards */
 .card:nth-child(1) { animation-delay: 0.1s; }
