@@ -65,7 +65,11 @@ func (s *Server) setupRoutes() {
 	api.HandleFunc("/cronjobs/{namespace}/{name}", s.getCronJob).Methods("GET")
 
 	// Static files and UI
-	s.router.PathPrefix("/static/").Handler(http.StripPrefix("/static/", http.FileServer(http.Dir("./web/static/"))))
+	staticDir, err := filepath.Abs("./web/static/")
+	if err != nil {
+		panic(fmt.Sprintf("Failed to determine absolute path for static files: %v", err))
+	}
+	s.router.PathPrefix("/static/").Handler(http.StripPrefix("/static/", http.FileServer(http.Dir(staticDir))))
 	s.router.HandleFunc("/", s.serveUI).Methods("GET")
 }
 
