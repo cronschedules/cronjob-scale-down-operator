@@ -2,6 +2,8 @@
 
 This guide helps you quickly test the new Web UI feature of the CronJob Scale Down Operator.
 
+![Web UI Dashboard](./images/web-ui.png)
+
 ## Prerequisites
 
 - Kubernetes cluster (minikube, kind, or any cluster)

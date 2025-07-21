@@ -2,6 +2,8 @@
 
 The CronJob Scale Down Operator now includes a built-in web UI that provides a dashboard to monitor and view the status of all CronJobScaleDown resources and their target deployments/statefulsets.
 
+![Web UI Dashboard](./images/web-ui.png)
+
 ## Features
 
 The web UI provides the following features:
