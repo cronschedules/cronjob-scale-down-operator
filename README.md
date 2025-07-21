@@ -180,6 +180,8 @@ kubectl get statefulset my-statefulset -w
 
 The operator includes a built-in web dashboard that provides real-time monitoring of all CronJobScaleDown resources and their target deployments/statefulsets.
 
+![Web UI Dashboard](./docs/images/web-ui.png)
+
 ### Accessing the Web UI
 
 By default, the web UI is available at `http://localhost:8082` when running the operator locally. In a Kubernetes cluster, you can access it by:
