@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
 	"path/filepath"
 	"time"
 
@@ -66,11 +67,20 @@ func (s *Server) setupRoutes() {
 	api.HandleFunc("/cronjobs/{namespace}/{name}", s.getCronJob).Methods("GET")
 
 	// Static files and UI
-	staticDir, err := filepath.Abs("./web/static/")
+	staticDir := "./web/static/"
+	if _, err := os.Stat(staticDir); os.IsNotExist(err) {
+		// Try absolute path from root (container environment)
+		staticDir = "/web/static/"
+		if _, err := os.Stat(staticDir); os.IsNotExist(err) {
+			panic("Static files directory not found in ./web/static/ or /web/static/")
+		}
+	}
+
+	absStaticDir, err := filepath.Abs(staticDir)
 	if err != nil {
 		panic(fmt.Sprintf("Failed to determine absolute path for static files: %v", err))
 	}
-	s.router.PathPrefix("/static/").Handler(http.StripPrefix("/static/", http.FileServer(http.Dir(staticDir))))
+	s.router.PathPrefix("/static/").Handler(http.StripPrefix("/static/", http.FileServer(http.Dir(absStaticDir))))
 	s.router.HandleFunc("/", s.serveUI).Methods("GET")
 }
 
