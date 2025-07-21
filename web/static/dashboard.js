@@ -240,15 +240,20 @@ class CronJobDashboard {
                     </div>
                 `;
             } else {
-                // Sort cronJobs by namespace then name for consistent ordering
-                cronJobs.sort((a, b) => {
-                    if (a.namespace !== b.namespace) {
-                        return a.namespace.localeCompare(b.namespace);
-                    }
-                    return a.name.localeCompare(b.name);
-                });
+                // Check if the fetched data has changed
+                if (!this.cachedCronJobs || JSON.stringify(this.cachedCronJobs) !== JSON.stringify(cronJobs)) {
+                    // Sort cronJobs by namespace then name for consistent ordering
+                    cronJobs.sort((a, b) => {
+                        if (a.namespace !== b.namespace) {
+                            return a.namespace.localeCompare(b.namespace);
+                        }
+                        return a.name.localeCompare(b.name);
+                    });
+                    // Cache the sorted data
+                    this.cachedCronJobs = cronJobs;
+                }
 
-                cronJobs.forEach(cronJob => {
+                this.cachedCronJobs.forEach(cronJob => {
                     containerEl.innerHTML += this.createCronJobCard(cronJob);
                 });
             }
