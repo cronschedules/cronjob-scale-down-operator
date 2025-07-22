@@ -1,0 +1,14 @@
+apiVersion: cronschedules.elbazi.co/v1
+kind: CronJobScaleDown
+metadata:
+  name: test-webui-cleanup
+  namespace: default
+spec:
+  cleanupSchedule: "0 0 */2 * * *"    # Every 2 hours
+  cleanupConfig:
+    annotationKey: "test.elbazi.co/cleanup-after"
+    resourceTypes:
+      - "ConfigMap"
+      - "Secret"
+    dryRun: true
+  timeZone: "UTC"

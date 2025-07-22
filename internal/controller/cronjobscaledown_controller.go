@@ -25,6 +25,7 @@ import (
 
 	"github.com/go-logr/logr"
 	"github.com/robfig/cron/v3"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -41,6 +42,15 @@ var (
 	// Maximum schedule length to prevent extremely long schedules
 	maxScheduleLength = 100
 )
+
+//+kubebuilder:rbac:groups=cronschedules.elbazi.co,resources=cronjobscaledowns,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=cronschedules.elbazi.co,resources=cronjobscaledowns/status,verbs=get;update;patch
+//+kubebuilder:rbac:groups=cronschedules.elbazi.co,resources=cronjobscaledowns/finalizers,verbs=update
+//+kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;update;patch
+//+kubebuilder:rbac:groups=apps,resources=statefulsets,verbs=get;list;watch;update;patch
+//+kubebuilder:rbac:groups="",resources=services,verbs=get;list;delete
+//+kubebuilder:rbac:groups="",resources=configmaps,verbs=get;list;delete
+//+kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;delete
 
 // CronJobScaleDownReconciler reconciles a CronJobScaleDown object
 type CronJobScaleDownReconciler struct {
@@ -70,8 +80,10 @@ func (r *CronJobScaleDownReconciler) Reconcile(ctx context.Context, req ctrl.Req
 }
 
 func (r *CronJobScaleDownReconciler) validateSpec(cronJobScaleDown *cronschedulesv1.CronJobScaleDown) error {
-	if cronJobScaleDown.Spec.ScaleDownSchedule == "" && cronJobScaleDown.Spec.ScaleUpSchedule == "" {
-		return fmt.Errorf("both ScaleDownSchedule and ScaleUpSchedule are empty")
+	if cronJobScaleDown.Spec.ScaleDownSchedule == "" &&
+		cronJobScaleDown.Spec.ScaleUpSchedule == "" &&
+		cronJobScaleDown.Spec.CleanupSchedule == "" {
+		return fmt.Errorf("all schedules (ScaleDownSchedule, ScaleUpSchedule, CleanupSchedule) are empty")
 	}
 
 	// Validate schedule lengths
@@ -80,6 +92,9 @@ func (r *CronJobScaleDownReconciler) validateSpec(cronJobScaleDown *cronschedule
 	}
 	if len(cronJobScaleDown.Spec.ScaleUpSchedule) > maxScheduleLength {
 		return fmt.Errorf("ScaleUpSchedule exceeds maximum length of %d characters", maxScheduleLength)
+	}
+	if len(cronJobScaleDown.Spec.CleanupSchedule) > maxScheduleLength {
+		return fmt.Errorf("CleanupSchedule exceeds maximum length of %d characters", maxScheduleLength)
 	}
 
 	// Validate schedule format
@@ -93,6 +108,18 @@ func (r *CronJobScaleDownReconciler) validateSpec(cronJobScaleDown *cronschedule
 			return fmt.Errorf("invalid ScaleUpSchedule: %w", err)
 		}
 	}
+	if cronJobScaleDown.Spec.CleanupSchedule != "" {
+		if err := r.validateCronSchedule(cronJobScaleDown.Spec.CleanupSchedule); err != nil {
+			return fmt.Errorf("invalid CleanupSchedule: %w", err)
+		}
+	}
+
+	// Validate cleanup configuration if cleanup schedule is provided
+	if cronJobScaleDown.Spec.CleanupSchedule != "" {
+		if err := r.validateCleanupConfig(cronJobScaleDown.Spec.CleanupConfig); err != nil {
+			return fmt.Errorf("invalid CleanupConfig: %w", err)
+		}
+	}
 
 	// Validate timezone
 	if cronJobScaleDown.Spec.TimeZone == "" {
@@ -102,9 +129,14 @@ func (r *CronJobScaleDownReconciler) validateSpec(cronJobScaleDown *cronschedule
 		return fmt.Errorf("invalid TimeZone: %w", err)
 	}
 
-	// Validate target reference
-	if err := r.validateTargetRef(&cronJobScaleDown.Spec.TargetRef); err != nil {
-		return fmt.Errorf("invalid TargetRef: %w", err)
+	// Validate target reference only if scaling schedules are provided
+	if cronJobScaleDown.Spec.ScaleDownSchedule != "" || cronJobScaleDown.Spec.ScaleUpSchedule != "" {
+		if cronJobScaleDown.Spec.TargetRef == nil {
+			return fmt.Errorf("targetRef is required when scaling schedules are provided")
+		}
+		if err := r.validateTargetRef(cronJobScaleDown.Spec.TargetRef); err != nil {
+			return fmt.Errorf("invalid TargetRef: %w", err)
+		}
 	}
 
 	return nil
@@ -183,6 +215,37 @@ func (r *CronJobScaleDownReconciler) validateTargetRef(targetRef *cronschedulesv
 	return nil
 }
 
+func (r *CronJobScaleDownReconciler) validateCleanupConfig(cleanupConfig *cronschedulesv1.CleanupConfig) error {
+	if cleanupConfig == nil {
+		return fmt.Errorf("cleanup config is required when cleanup schedule is provided")
+	}
+
+	if cleanupConfig.AnnotationKey == "" {
+		return fmt.Errorf("cleanup annotation key cannot be empty")
+	}
+
+	if len(cleanupConfig.ResourceTypes) == 0 {
+		return fmt.Errorf("at least one resource type must be specified for cleanup")
+	}
+
+	// Validate supported resource types
+	supportedTypes := map[string]bool{
+		"Deployment":  true,
+		"StatefulSet": true,
+		"Service":     true,
+		"ConfigMap":   true,
+		"Secret":      true,
+	}
+
+	for _, resourceType := range cleanupConfig.ResourceTypes {
+		if !supportedTypes[resourceType] {
+			return fmt.Errorf("unsupported resource type for cleanup: %s", resourceType)
+		}
+	}
+
+	return nil
+}
+
 func (r *CronJobScaleDownReconciler) processSchedules(ctx context.Context, cronJobScaleDown *cronschedulesv1.CronJobScaleDown) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
 	k8sClient := &utils.K8sClient{Client: r.Client}
@@ -206,19 +269,31 @@ func (r *CronJobScaleDownReconciler) processSchedules(ctx context.Context, cronJ
 		return ctrl.Result{}, nil
 	}
 
+	cleanupNext, err := r.parseSchedule(cronJobScaleDown.Spec.CleanupSchedule, now)
+	if err != nil {
+		logger.Error(err, "Error parsing cleanup schedule", "schedule", cronJobScaleDown.Spec.CleanupSchedule)
+		return ctrl.Result{}, nil
+	}
+
 	didScale, err := r.executeScaling(ctx, k8sClient, cronJobScaleDown, now, scaleDownNext, scaleUpNext)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
 
-	if didScale {
+	didCleanup, err := r.executeCleanup(ctx, k8sClient, cronJobScaleDown, now)
+	if err != nil {
+		logger.Error(err, "Error executing cleanup")
+		// Don't return error, just log it and continue
+	}
+
+	if didScale || didCleanup {
 		if err := r.Status().Update(ctx, cronJobScaleDown); err != nil {
 			logger.Error(err, "Error updating CronJobScaleDown status")
 			return ctrl.Result{}, err
 		}
 	}
 
-	return r.calculateRequeue(logger, now, scaleDownNext, scaleUpNext), nil
+	return r.calculateRequeue(logger, now, scaleDownNext, scaleUpNext, cleanupNext), nil
 }
 
 func (r *CronJobScaleDownReconciler) parseSchedule(schedule string, now time.Time) (time.Time, error) {
@@ -255,6 +330,11 @@ func (r *CronJobScaleDownReconciler) executeScaling(ctx context.Context, k8sClie
 	logger := log.FromContext(ctx)
 	var didScale bool
 
+	// Skip scaling if no targetRef is provided
+	if cronJobScaleDown.Spec.TargetRef == nil {
+		return false, nil
+	}
+
 	// Debug logging
 	logger.Info("Checking scaling conditions",
 		"now", now.Format(time.RFC3339),
@@ -265,24 +345,34 @@ func (r *CronJobScaleDownReconciler) executeScaling(ctx context.Context, k8sClie
 
 	if r.shouldScaleDown(cronJobScaleDown, now) {
 		logger.Info("Scaling down the target resource")
-		if err := k8sClient.ScaleDownTargetResource(ctx, utils.TargetObject{TargetRef: cronJobScaleDown.Spec.TargetRef}); err != nil {
-			logger.Error(err, "Error scaling down target resource")
-			return false, err
+		if err := k8sClient.ScaleDownTargetResource(ctx, utils.TargetObject{TargetRef: *cronJobScaleDown.Spec.TargetRef}); err != nil {
+			if apierrors.IsNotFound(err) {
+				logger.Info("Target resource not found for scale down, skipping", "error", err.Error())
+			} else {
+				logger.Error(err, "Error scaling down target resource")
+				return false, err
+			}
+		} else {
+			cronJobScaleDown.Status.LastScaleDownTime = metav1.Time{Time: now}
+			r.updateCurrentReplicas(ctx, k8sClient, cronJobScaleDown)
+			didScale = true
 		}
-		cronJobScaleDown.Status.LastScaleDownTime = metav1.Time{Time: now}
-		r.updateCurrentReplicas(ctx, k8sClient, cronJobScaleDown)
-		didScale = true
 	}
 
 	if r.shouldScaleUp(cronJobScaleDown, now) {
 		logger.Info("Scaling up the target resource")
-		if err := k8sClient.ScaleUpTargetResource(ctx, utils.TargetObject{TargetRef: cronJobScaleDown.Spec.TargetRef}); err != nil {
-			logger.Error(err, "Error scaling up target resource")
-			return false, err
+		if err := k8sClient.ScaleUpTargetResource(ctx, utils.TargetObject{TargetRef: *cronJobScaleDown.Spec.TargetRef}); err != nil {
+			if apierrors.IsNotFound(err) {
+				logger.Info("Target resource not found for scale up, skipping", "error", err.Error())
+			} else {
+				logger.Error(err, "Error scaling up target resource")
+				return false, err
+			}
+		} else {
+			cronJobScaleDown.Status.LastScaleUpTime = metav1.Time{Time: now}
+			r.updateCurrentReplicas(ctx, k8sClient, cronJobScaleDown)
+			didScale = true
 		}
-		cronJobScaleDown.Status.LastScaleUpTime = metav1.Time{Time: now}
-		r.updateCurrentReplicas(ctx, k8sClient, cronJobScaleDown)
-		didScale = true
 	}
 
 	return didScale, nil
@@ -304,19 +394,61 @@ func (r *CronJobScaleDownReconciler) shouldScaleUp(cronJobScaleDown *cronschedul
 	)
 }
 
+func (r *CronJobScaleDownReconciler) executeCleanup(ctx context.Context, k8sClient *utils.K8sClient, cronJobScaleDown *cronschedulesv1.CronJobScaleDown, now time.Time) (bool, error) {
+	logger := log.FromContext(ctx)
+
+	if !r.shouldCleanup(cronJobScaleDown, now) {
+		return false, nil
+	}
+
+	if cronJobScaleDown.Spec.CleanupConfig == nil {
+		logger.Error(nil, "Cleanup config is nil but cleanup should execute")
+		return false, fmt.Errorf("cleanup config is nil")
+	}
+
+	logger.Info("Executing resource cleanup")
+
+	// Use the CronJobScaleDown's namespace as default
+	defaultNamespace := cronJobScaleDown.Namespace
+	cleanedCount, err := k8sClient.CleanupResources(ctx, cronJobScaleDown.Spec.CleanupConfig, defaultNamespace)
+	if err != nil {
+		logger.Error(err, "Error during resource cleanup")
+		return false, err
+	}
+
+	cronJobScaleDown.Status.LastCleanupTime = metav1.Time{Time: now}
+	cronJobScaleDown.Status.LastCleanupResourceCount = cleanedCount
+
+	logger.Info("Cleanup completed", "resourcesCleaned", cleanedCount)
+	return true, nil
+}
+
+func (r *CronJobScaleDownReconciler) shouldCleanup(cronJobScaleDown *cronschedulesv1.CronJobScaleDown, now time.Time) bool {
+	return r.shouldExecuteNow(
+		cronJobScaleDown.Spec.CleanupSchedule,
+		now,
+		cronJobScaleDown.Status.LastCleanupTime.Time,
+	)
+}
+
 func (r *CronJobScaleDownReconciler) updateCurrentReplicas(ctx context.Context, k8sClient *utils.K8sClient, cronJobScaleDown *cronschedulesv1.CronJobScaleDown) {
-	if current := k8sClient.GetReplicasCount(ctx, utils.TargetObject{TargetRef: cronJobScaleDown.Spec.TargetRef}); current != nil {
-		cronJobScaleDown.Status.CurrentReplicas = *current
+	if cronJobScaleDown.Spec.TargetRef != nil {
+		if current := k8sClient.GetReplicasCount(ctx, utils.TargetObject{TargetRef: *cronJobScaleDown.Spec.TargetRef}); current != nil {
+			cronJobScaleDown.Status.CurrentReplicas = *current
+		}
 	}
 }
 
-func (r *CronJobScaleDownReconciler) calculateRequeue(logger logr.Logger, now time.Time, scaleDownNext, scaleUpNext time.Time) ctrl.Result {
+func (r *CronJobScaleDownReconciler) calculateRequeue(logger logr.Logger, now time.Time, scaleDownNext, scaleUpNext, cleanupNext time.Time) ctrl.Result {
 	nexts := []time.Time{}
 	if !scaleDownNext.IsZero() {
 		nexts = append(nexts, scaleDownNext)
 	}
 	if !scaleUpNext.IsZero() {
 		nexts = append(nexts, scaleUpNext)
+	}
+	if !cleanupNext.IsZero() {
+		nexts = append(nexts, cleanupNext)
 	}
 
 	soonest := time.Time{}

@@ -39,6 +39,44 @@ spec:
           spec:
             description: CronJobScaleDownSpec defines the desired state of CronJobScaleDown.
             properties:
+              cleanupConfig:
+                description: Cleanup configuration for deleting resources based on
+                  annotations
+                properties:
+                  annotationKey:
+                    description: Annotation key that marks resources for cleanup
+                    type: string
+                  dryRun:
+                    default: false
+                    description: DryRun mode - if true, only logs what would be deleted
+                      without actually deleting
+                    type: boolean
+                  labelSelector:
+                    additionalProperties:
+                      type: string
+                    description: Label selector to further filter resources for cleanup
+                    type: object
+                  namespaces:
+                    description: Namespaces to search for resources to cleanup (defaults
+                      to same namespace as the CronJobScaleDown)
+                    items:
+                      type: string
+                    type: array
+                  resourceTypes:
+                    description: Resource types to cleanup (e.g., ["Deployment", "StatefulSet",
+                      "Service", "ConfigMap"])
+                    items:
+                      type: string
+                    minItems: 1
+                    type: array
+                required:
+                - annotationKey
+                - resourceTypes
+                type: object
+              cleanupSchedule:
+                description: Cron schedule for cleaning up resources (e.g., "0 0 *
+                  * 0" for every Sunday)
+                type: string
               scaleDownSchedule:
                 description: Cron schedule for scaling down (e.g., "0 22 * * *" for
                   10 PM daily)
@@ -77,7 +115,6 @@ spec:
                 description: Timezone (e.g., "America/New_York", "UTC")
                 type: string
             required:
-            - targetRef
             - timeZone
             type: object
           status:
@@ -87,6 +124,16 @@ spec:
                 description: CurrentReplicas is the current number of replicas
                 format: int32
                 type: integer
+              lastCleanupResourceCount:
+                description: LastCleanupResourceCount is the number of resources cleaned
+                  up in the last cleanup operation
+                format: int32
+                type: integer
+              lastCleanupTime:
+                description: LastCleanupTime is the time when the cleanup was last
+                  performed
+                format: date-time
+                type: string
               lastScaleDownTime:
                 description: LastScaleDownTime is the time when the scale down was
                   last performed

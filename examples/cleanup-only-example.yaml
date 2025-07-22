@@ -1,0 +1,73 @@
+---
+# Example CronJobScaleDown for cleanup-only functionality
+# This example shows how to use the operator just for cleaning up test resources
+# without any scaling functionality
+apiVersion: cronschedules.elbazi.co/v1
+kind: CronJobScaleDown
+metadata:
+  name: cleanup-only-example
+  namespace: default
+spec:
+  # No scaling schedules - cleanup only
+  cleanupSchedule: "0 0 */6 * * *"    # Run cleanup every 6 hours (6-field cron format)
+  cleanupConfig:
+    # Look for resources with this annotation
+    annotationKey: "test.elbazi.co/cleanup-after"
+    
+    # Clean up these resource types
+    resourceTypes:
+      - "Deployment"
+      - "Service"
+      - "ConfigMap"
+    
+    # Optional: Additional filters
+    labelSelector:
+      app.kubernetes.io/created-by: "test"
+    
+    # Enable dry-run to see what would be deleted
+    dryRun: false
+  
+  timeZone: "UTC"
+
+---
+# Example resources that would be cleaned up
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: temporary-test-deployment
+  namespace: default
+  labels:
+    app.kubernetes.io/created-by: "test"
+  annotations:
+    # Delete this deployment 5 minutes after creation
+    test.elbazi.co/cleanup-after: "5m"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: temp-app
+  template:
+    metadata:
+      labels:
+        app: temp-app
+    spec:
+      containers:
+      - name: nginx
+        image: nginx:latest
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: temporary-test-service
+  namespace: default
+  labels:
+    app.kubernetes.io/created-by: "test"
+  annotations:
+    # Delete this service at a specific time
+    test.elbazi.co/cleanup-after: "2024-12-31T23:59:59Z"
+spec:
+  selector:
+    app: temp-app
+  ports:
+  - port: 80

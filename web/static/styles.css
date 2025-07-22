@@ -255,6 +255,12 @@ body {
     border: 1px solid var(--danger-color);
 }
 
+.status-badge.status-cleanup {
+    background: var(--warning-light);
+    color: var(--warning-color);
+    border: 1px solid var(--warning-color);
+}
+
 .replica-container {
     margin-top: 0.75rem;
 }

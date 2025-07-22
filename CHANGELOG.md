@@ -5,6 +5,37 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2025-07-22
+
+### Added
+- **Cleanup-Only Mode**: New pure cleanup functionality without requiring target scaling resources
+  - Dedicated cleanup-only CronJobScaleDown resources
+  - Perfect for CI/CD pipelines, test resource cleanup, and cost optimization
+  - No `targetRef` required for cleanup-only operations
+- **Enhanced Web UI**: 
+  - Support for cleanup-only resources with special UI elements
+  - "Cleanup Only" status badges and indicators
+  - Cleanup schedule display and last cleanup timestamps
+  - Graceful handling of missing target resources without crashes
+- **Improved Error Handling**:
+  - Controller gracefully handles missing target resources
+  - Web UI continues to function when target deployments are not found
+  - Enhanced logging with appropriate error levels
+- **Enhanced RBAC**: Added permissions for cleanup operations on ConfigMaps, Secrets, and Services
+- **Documentation**: 
+  - New dedicated cleanup documentation (`docs/cleanup.md`)
+  - Updated examples with cleanup-only configurations
+  - Enhanced README with cleanup-only mode explanations
+
+### Fixed
+- **Web UI JavaScript Errors**: Fixed "targetStatus is undefined" errors when displaying cleanup-only resources
+- **Null Pointer Handling**: Added proper null checks for optional fields in web UI
+- **Missing Target Resources**: Controller and web UI now handle missing target resources gracefully
+
+### Changed
+- **API Response Format**: Added `isCleanupOnly` field to distinguish cleanup-only resources
+- **Web UI Design**: Enhanced visual distinction between scaling and cleanup-only resources
+
 ## [0.2.0] - 2025-01-21
 
 ### Added

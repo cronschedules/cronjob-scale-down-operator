@@ -7,7 +7,6 @@ issues:
   # don't exclude the default set of lint
   exclude-use-default: false
   # restore some of the defaults
-  # (fill in the rest as needed)
   exclude-rules:
     - path: "api/*"
       linters:
@@ -16,6 +15,10 @@ issues:
       linters:
         - dupl
         - lll
+    # Exclude kubebuilder annotations from comment-spacings rule
+    - source: "^//\\+kubebuilder:"
+      linters:
+        - revive
 linters:
   disable-all: true
   enable:
