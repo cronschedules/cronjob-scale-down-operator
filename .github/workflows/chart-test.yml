@@ -49,7 +49,8 @@ jobs:
           cluster_name: kind
 
       - name: Run chart-testing (install)
-        run: ct install --target-branch ${{ github.event.repository.default_branch }} --all
+        run: ct install --target-branch ${{ github.event.repository.default_branch }} --all --namespace-template 'ct-{{ .Release.Name }}' --debug
+        timeout-minutes: 10
 
   security-scan:
     runs-on: ubuntu-latest

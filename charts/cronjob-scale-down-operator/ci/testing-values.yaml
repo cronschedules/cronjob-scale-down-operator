@@ -14,8 +14,8 @@ resources:
     memory: "128Mi"
     cpu: "100m"
   requests:
-    memory: "64Mi"
-    cpu: "50m"
+    memory: "32Mi"
+    cpu: "10m"
 
 # Disable Web UI for testing to reduce resource usage
 webUI:
@@ -56,12 +56,18 @@ podAnnotations:
 # Probes with longer delays for testing
 livenessProbe:
   enabled: true
+  httpGet:
+    path: /healthz
+    port: 8081
   initialDelaySeconds: 60
   periodSeconds: 30
   timeoutSeconds: 10
 
 readinessProbe:
   enabled: true
+  httpGet:
+    path: /readyz
+    port: 8081
   initialDelaySeconds: 30
   periodSeconds: 15
   timeoutSeconds: 10
