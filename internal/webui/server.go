@@ -146,7 +146,7 @@ func (s *Server) getCronJob(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (s *Server) buildCronJobStatus(ctx context.Context, cronJob *cronschedulesv1.CronJobScaleDown) (*CronJobStatus, error) {
+func (s *Server) buildCronJobStatus(ctx context.Context, cronJob *cronschedulesv1.CronJobScaleDown) (*CronJobStatus, error) { //nolint:unparam // error return kept for future extensibility
 	log := log.FromContext(ctx)
 
 	status := &CronJobStatus{
