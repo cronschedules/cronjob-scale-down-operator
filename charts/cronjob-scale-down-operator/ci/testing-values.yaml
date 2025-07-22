@@ -4,18 +4,18 @@ nameOverride: "test-cronjob-operator"
 image:
   repository: ghcr.io/z4ck404/cronjob-scale-down-operator
   tag: "0.3.0"
-  pullPolicy: IfNotPresent
+  pullPolicy: Always
 
 replicaCount: 1
 
 # Reduced resources for testing
 resources:
   limits:
-    memory: "128Mi"
-    cpu: "100m"
+    memory: "64Mi"
+    cpu: "50m"
   requests:
-    memory: "32Mi"
-    cpu: "10m"
+    memory: "16Mi"
+    cpu: "5m"
 
 # Disable Web UI for testing to reduce resource usage
 webUI:
@@ -53,24 +53,37 @@ affinity: {}
 podAnnotations:
   kubectl.kubernetes.io/default-container: manager
 
+# Startup probe for slow-starting containers
+startupProbe:
+  enabled: true
+  httpGet:
+    path: /healthz
+    port: 8081
+  initialDelaySeconds: 10
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 30
+
 # Probes with longer delays for testing
 livenessProbe:
   enabled: true
   httpGet:
     path: /healthz
     port: 8081
-  initialDelaySeconds: 60
-  periodSeconds: 30
-  timeoutSeconds: 10
+  initialDelaySeconds: 120
+  periodSeconds: 60
+  timeoutSeconds: 30
+  failureThreshold: 5
 
 readinessProbe:
   enabled: true
   httpGet:
     path: /readyz
     port: 8081
-  initialDelaySeconds: 30
-  periodSeconds: 15
-  timeoutSeconds: 10
+  initialDelaySeconds: 60
+  periodSeconds: 30
+  timeoutSeconds: 15
+  failureThreshold: 3
 
 # Metrics
 metrics:

@@ -62,6 +62,10 @@ spec:
           name: webui
           protocol: TCP
         {{- end }}
+        {{- if .Values.startupProbe.enabled }}
+        startupProbe:
+          {{- omit .Values.startupProbe "enabled" | toYaml | nindent 10 }}
+        {{- end }}
         {{- if .Values.livenessProbe.enabled }}
         livenessProbe:
           {{- omit .Values.livenessProbe "enabled" | toYaml | nindent 10 }}

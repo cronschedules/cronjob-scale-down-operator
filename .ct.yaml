@@ -8,3 +8,4 @@ debug: true
 validate-maintainers: false
 check-version-increment: false
 upgrade: false
+install-timeout: 600
