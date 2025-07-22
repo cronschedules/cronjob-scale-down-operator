@@ -167,11 +167,13 @@ func (s *Server) buildCronJobStatus(ctx context.Context, cronJob *cronschedulesv
 	}
 
 	// Get target resource status
-	targetStatus, err := s.getTargetStatus(ctx, cronJob.Spec.TargetRef)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get target status: %v", err)
+	if cronJob.Spec.TargetRef != nil {
+		targetStatus, err := s.getTargetStatus(ctx, *cronJob.Spec.TargetRef)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get target status: %v", err)
+		}
+		status.TargetStatus = *targetStatus
 	}
-	status.TargetStatus = *targetStatus
 
 	return status, nil
 }

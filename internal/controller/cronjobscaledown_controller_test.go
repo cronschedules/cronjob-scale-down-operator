@@ -52,7 +52,7 @@ var _ = Describe("CronJobScaleDown Controller", func() {
 						Namespace: "default",
 					},
 					Spec: cronschedulesv1.CronJobScaleDownSpec{
-						TargetRef: cronschedulesv1.TargetRef{
+						TargetRef: &cronschedulesv1.TargetRef{
 							Name:      "test-deployment",
 							Namespace: "default",
 							Kind:      "Deployment",
@@ -86,6 +86,63 @@ var _ = Describe("CronJobScaleDown Controller", func() {
 			Expect(err).NotTo(HaveOccurred())
 			// TODO(user): Add more specific assertions depending on your controller's reconciliation logic.
 			// Example: If you expect a certain status condition after reconciliation, verify it here.
+		})
+	})
+
+	Context("When testing cleanup functionality", func() {
+		const cleanupResourceName = "test-cleanup-resource"
+
+		ctx := context.Background()
+
+		typeNamespacedName := types.NamespacedName{
+			Name:      cleanupResourceName,
+			Namespace: "default",
+		}
+		cronjobscaledown := &cronschedulesv1.CronJobScaleDown{}
+
+		BeforeEach(func() {
+			By("creating the custom resource for cleanup testing")
+			err := k8sClient.Get(ctx, typeNamespacedName, cronjobscaledown)
+			if err != nil && errors.IsNotFound(err) {
+				resource := &cronschedulesv1.CronJobScaleDown{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      cleanupResourceName,
+						Namespace: "default",
+					},
+					Spec: cronschedulesv1.CronJobScaleDownSpec{
+						CleanupSchedule: "*/30 * * * * *", // Every 30 seconds for testing
+						CleanupConfig: &cronschedulesv1.CleanupConfig{
+							AnnotationKey: "test.elbazi.co/cleanup-after",
+							ResourceTypes: []string{"ConfigMap"},
+							DryRun:        true, // Use dry run for testing
+						},
+						TimeZone: "UTC",
+					},
+				}
+				Expect(k8sClient.Create(ctx, resource)).To(Succeed())
+			}
+		})
+
+		AfterEach(func() {
+			resource := &cronschedulesv1.CronJobScaleDown{}
+			err := k8sClient.Get(ctx, typeNamespacedName, resource)
+			Expect(err).NotTo(HaveOccurred())
+
+			By("Cleanup the specific resource instance CronJobScaleDown")
+			Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
+		})
+
+		It("should reconcile without error for cleanup-only configuration", func() {
+			By("Reconciling the created resource")
+			controllerReconciler := &CronJobScaleDownReconciler{
+				Client: k8sClient,
+				Scheme: k8sClient.Scheme(),
+			}
+
+			_, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
+				NamespacedName: typeNamespacedName,
+			})
+			Expect(err).NotTo(HaveOccurred())
 		})
 	})
 })

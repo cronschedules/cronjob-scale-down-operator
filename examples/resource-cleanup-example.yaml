@@ -1,0 +1,109 @@
+---
+# Example CronJobScaleDown with resource cleanup functionality
+# This example demonstrates how to use the cleanup feature to automatically
+# delete test resources based on annotations
+apiVersion: cronschedules.elbazi.co/v1
+kind: CronJobScaleDown
+metadata:
+  name: test-resource-cleanup
+  namespace: default
+spec:
+  # Optional: Still supports scaling if needed
+  targetRef:
+    name: nginx-test
+    namespace: default
+    kind: Deployment
+    apiVersion: apps/v1
+  scaleDownSchedule: "0 0 22 * * *"  # Scale down at 10 PM
+  scaleUpSchedule: "0 0 6 * * *"     # Scale up at 6 AM
+  
+  # New cleanup functionality
+  cleanupSchedule: "0 0 2 * * *"     # Run cleanup at 2 AM daily
+  cleanupConfig:
+    # Annotation that marks resources for cleanup
+    annotationKey: "cleanup-after"
+    
+    # Resource types to check for cleanup
+    resourceTypes:
+      - "Deployment"
+      - "Service"
+      - "ConfigMap"
+      - "Secret"
+    
+    # Optional: Only cleanup resources in these namespaces
+    # If not specified, uses the same namespace as this CronJobScaleDown
+    namespaces:
+      - "default"
+      - "test"
+      - "lab"
+    
+    # Optional: Additional label selector to filter resources
+    labelSelector:
+      environment: "test"
+    
+    # Optional: Enable dry-run mode to see what would be deleted without actually deleting
+    dryRun: false
+  
+  timeZone: "UTC"
+
+---
+# Example test deployment that will be cleaned up
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: test-deployment-with-cleanup
+  namespace: default
+  labels:
+    environment: "test"
+  annotations:
+    # This deployment will be deleted 24 hours after creation
+    cleanup-after: "24h"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: test-app
+  template:
+    metadata:
+      labels:
+        app: test-app
+    spec:
+      containers:
+      - name: nginx
+        image: nginx:latest
+        ports:
+        - containerPort: 80
+
+---
+# Example service that will be cleaned up on a specific date
+apiVersion: v1
+kind: Service
+metadata:
+  name: test-service-with-cleanup
+  namespace: default
+  labels:
+    environment: "test"
+  annotations:
+    # This service will be deleted on January 1st, 2025
+    cleanup-after: "2025-01-01"
+spec:
+  selector:
+    app: test-app
+  ports:
+  - port: 80
+    targetPort: 80
+
+---
+# Example configmap that will be cleaned up immediately (empty annotation value)
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: test-configmap-immediate-cleanup
+  namespace: default
+  labels:
+    environment: "test"
+  annotations:
+    # Empty value means cleanup immediately on next schedule
+    cleanup-after: ""
+data:
+  key: "value"
