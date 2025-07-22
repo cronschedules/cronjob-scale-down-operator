@@ -1,0 +1,80 @@
+# Test values for chart testing in CI
+nameOverride: "test-cronjob-operator"
+
+image:
+  repository: ghcr.io/z4ck404/cronjob-scale-down-operator
+  tag: "0.3.0"
+  pullPolicy: IfNotPresent
+
+replicaCount: 1
+
+# Reduced resources for testing
+resources:
+  limits:
+    memory: "128Mi"
+    cpu: "100m"
+  requests:
+    memory: "64Mi"
+    cpu: "50m"
+
+# Disable Web UI for testing to reduce resource usage
+webUI:
+  enabled: false
+
+# Service account
+serviceAccount:
+  create: true
+  automount: true
+
+# Security context
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 65532
+
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+  readOnlyRootFilesystem: true
+  runAsNonRoot: true
+  runAsUser: 65532
+
+# Node selector
+nodeSelector: {}
+
+# Tolerations
+tolerations: []
+
+# Affinity
+affinity: {}
+
+# Pod annotations
+podAnnotations:
+  kubectl.kubernetes.io/default-container: manager
+
+# Probes with longer delays for testing
+livenessProbe:
+  enabled: true
+  initialDelaySeconds: 60
+  periodSeconds: 30
+  timeoutSeconds: 10
+
+readinessProbe:
+  enabled: true
+  initialDelaySeconds: 30
+  periodSeconds: 15
+  timeoutSeconds: 10
+
+# Metrics
+metrics:
+  enabled: true
+  serviceMonitor:
+    enabled: false
+
+# Test environment specific settings
+env:
+  - name: LOG_LEVEL
+    value: "info"
+  - name: LEADER_ELECT
+    value: "false"  # Disable leader election for single replica testing

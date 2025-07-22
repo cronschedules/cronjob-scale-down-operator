@@ -39,6 +39,28 @@ helm install cronjob-scale-down-operator ./charts/cronjob-scale-down-operator \
   --set resources.requests.memory=128Mi
 ```
 
+## Testing
+
+This chart includes comprehensive testing using [chart-testing](https://github.com/helm/chart-testing) and GitHub Actions.
+
+### Local Testing
+
+Run the included test script to validate the chart locally:
+
+```bash
+./scripts/test-chart.sh
+```
+
+### CI Test Values
+
+The chart is tested with multiple configuration scenarios:
+- **`ci/testing-values.yaml`**: CI-optimized configuration with reduced resources
+- **`ci/default-values.yaml`**: Standard production-like settings
+- **`ci/minimal-values.yaml`**: Minimal resource allocation
+- **`ci/ha-values.yaml`**: High availability configuration
+
+See the [Chart Testing Setup](../README.md) for detailed information about the testing infrastructure.
+
 ## Configuration
 
 The following table lists the configurable parameters and their default values:

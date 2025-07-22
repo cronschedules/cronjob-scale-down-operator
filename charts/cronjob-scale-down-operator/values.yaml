@@ -30,7 +30,7 @@ securityContext:
   allowPrivilegeEscalation: false
   capabilities:
     drop:
-    - "ALL"
+      - "ALL"
   readOnlyRootFilesystem: true
   runAsNonRoot: true
   runAsUser: 65532
@@ -49,14 +49,16 @@ resources:
 
 # Liveness probe configuration
 livenessProbe:
+  enabled: true
   httpGet:
     path: /healthz
     port: 8081
   initialDelaySeconds: 15
   periodSeconds: 20
 
-# Readiness probe configuration  
+# Readiness probe configuration
 readinessProbe:
+  enabled: true
   httpGet:
     path: /readyz
     port: 8081

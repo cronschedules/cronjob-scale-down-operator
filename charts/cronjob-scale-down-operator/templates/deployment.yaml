@@ -59,13 +59,13 @@ spec:
           name: webui
           protocol: TCP
         {{- end }}
-        {{- with .Values.livenessProbe }}
+        {{- if .Values.livenessProbe.enabled }}
         livenessProbe:
-          {{- toYaml . | nindent 10 }}
+          {{- omit .Values.livenessProbe "enabled" | toYaml | nindent 10 }}
         {{- end }}
-        {{- with .Values.readinessProbe }}
+        {{- if .Values.readinessProbe.enabled }}
         readinessProbe:
-          {{- toYaml . | nindent 10 }}
+          {{- omit .Values.readinessProbe "enabled" | toYaml | nindent 10 }}
         {{- end }}
         resources:
           {{- toYaml .Values.resources | nindent 10 }}

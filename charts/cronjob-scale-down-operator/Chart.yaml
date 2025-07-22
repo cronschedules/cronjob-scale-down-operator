@@ -1,6 +1,7 @@
 apiVersion: v2
 name: cronjob-scale-down-operator
-description: A Kubernetes operator that automatically scales down Deployments and StatefulSets during specific time windows and cleans up test resources to save resources and costs
+description: A Kubernetes operator that automatically scales down Deployments
+  and StatefulSets during specific time windows and cleans up test resources
 type: application
 version: 0.3.0
 appVersion: "0.3.0"

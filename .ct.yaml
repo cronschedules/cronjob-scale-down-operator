@@ -1,0 +1,10 @@
+# Configuration for chart testing
+chart-dirs:
+  - charts
+target-branch: main
+remote: origin
+helm-extra-args: --timeout 600s
+debug: true
+validate-maintainers: false
+check-version-increment: false
+upgrade: false
