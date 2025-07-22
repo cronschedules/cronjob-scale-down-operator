@@ -8,10 +8,12 @@ A Kubernetes operator that automatically scales down Deployments and StatefulSet
 - 🕒 **Cron-based Scheduling**: Uses standard cron expressions with second precision
 - 🌍 **Timezone Support**: Configure schedules in any timezone
 - 📈 **Flexible Scaling**: Scale down and up on different schedules
-- 🎯 **Multiple Resource Types**: Supports Deployments and StatefulSets
+- 🎯 **Multiple Resource Types**: Supports Deployments and StatefulSets for scaling
+- 🧹 **Resource Cleanup**: Automatically delete test resources based on annotations
 - 📊 **Status Tracking**: Monitor last execution times and current replica counts
 - 🌐 **Web UI Dashboard**: Built-in web interface to monitor all cron jobs and their status
 - ⚡ **Efficient**: Only reconciles when needed, with smart requeue timing
+- 🛡️ **Safe Testing**: Dry-run mode for cleanup operations
 
 ## Quick Start
 
@@ -90,6 +92,8 @@ The [`examples/`](./examples/) directory contains various use cases:
 | **[development-testing.yaml](./examples/development-testing.yaml)** | Dev environment | Every 30/45 seconds |
 | **[multi-timezone.yaml](./examples/multi-timezone.yaml)** | Global deployments | Multiple timezones |
 | **[statefulset-example.yaml](./examples/statefulset-example.yaml)** | Database scaling | StatefulSet support |
+| **[resource-cleanup-example.yaml](./examples/resource-cleanup-example.yaml)** | **Resource cleanup** | **Combined scaling + cleanup** |
+| **[cleanup-only-example.yaml](./examples/cleanup-only-example.yaml)** | **Cleanup only** | **Every 6 hours** |
 
 ## Configuration
 
@@ -117,6 +121,80 @@ spec:
   
   # Timezone for schedule interpretation
   timeZone: "UTC"  # or "America/New_York", "Europe/London", etc.
+```
+
+### Resource Cleanup Configuration
+
+The operator now supports automatic cleanup of test resources based on annotations:
+
+```yaml
+apiVersion: cronschedules.elbazi.co/v1
+kind: CronJobScaleDown
+metadata:
+  name: test-cleanup
+  namespace: default
+spec:
+  # Optional: You can still use scaling features alongside cleanup
+  targetRef:
+    name: my-deployment
+    namespace: default
+    kind: Deployment
+    apiVersion: apps/v1
+  scaleDownSchedule: "0 0 22 * * *"
+  scaleUpSchedule: "0 0 6 * * *"
+  
+  # Cleanup configuration
+  cleanupSchedule: "0 0 2 * * *"  # Run cleanup at 2 AM daily
+  cleanupConfig:
+    # Annotation key that marks resources for cleanup
+    annotationKey: "cleanup-after"
+    
+    # Resource types to cleanup
+    resourceTypes:
+      - "Deployment"
+      - "Service" 
+      - "ConfigMap"
+      - "Secret"
+      - "StatefulSet"
+    
+    # Optional: Limit cleanup to specific namespaces
+    namespaces:
+      - "test"
+      - "lab"
+    
+    # Optional: Additional label selector
+    labelSelector:
+      environment: "test"
+    
+    # Optional: Enable dry-run mode (default: false)
+    dryRun: false
+  
+  timeZone: "UTC"
+```
+
+#### Cleanup Time Formats
+
+Resources can be marked for cleanup using various time formats in the annotation value:
+
+- **Duration**: `24h`, `7d`, `30m` (relative to resource creation time)
+- **Absolute time**: `2024-12-31T23:59:59Z` (RFC3339 format)
+- **Date**: `2024-12-31` (cleanup at midnight on that date)
+- **Immediate**: Empty value `""` (cleanup on next schedule run)
+
+#### Example Resource with Cleanup Annotation
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: test-deployment
+  namespace: test
+  labels:
+    environment: "test"
+  annotations:
+    cleanup-after: "24h"  # Delete 24 hours after creation
+spec:
+  # ... deployment spec
 ```
 
 ### Schedule Format
