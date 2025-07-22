@@ -4,6 +4,7 @@
 
 - Features
   - [Web UI Dashboard](webui.md)
+  - [Resource Cleanup](cleanup.md)
   - [Testing Web UI](TESTING_WEBUI.md)
 
 - Security

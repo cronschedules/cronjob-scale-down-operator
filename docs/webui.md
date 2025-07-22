@@ -10,11 +10,13 @@ The web UI provides the following features:
 
 - **Real-time Dashboard**: View all CronJobScaleDown resources in a clean, organized interface
 - **Status Monitoring**: Monitor the current state of target deployments and statefulsets
-- **Schedule Information**: View scale-up and scale-down schedules with timezone information
+- **Cleanup-Only Support**: Special UI for cleanup-only resources without target scaling
+- **Schedule Information**: View scale-up, scale-down, and cleanup schedules with timezone information
 - **Replica Status**: Visual indicators showing ready vs desired replicas
-- **Action History**: Last scale-up and scale-down timestamps
+- **Action History**: Last scale-up, scale-down, and cleanup timestamps
 - **Auto-refresh**: Automatically updates data every 30 seconds
 - **Responsive Design**: Works on desktop, tablet, and mobile devices
+- **Graceful Error Handling**: Continues to display information even when target resources are missing
 
 ## Access
 
@@ -38,21 +40,25 @@ Each CronJobScaleDown resource is displayed as a card containing:
 
 1. **Resource Information**
    - Resource name and namespace
-   - Target resource (kind, name, namespace)
+   - Target resource (kind, name, namespace) - for scaling resources
+   - "Cleanup-only mode" indicator - for cleanup-only resources
 
 2. **Current Status**
-   - Ready/Not Ready indicator with visual badges
-   - Replica count with progress bar visualization
-   - Available vs desired replicas
+   - Ready/Not Ready indicator with visual badges for scaling resources
+   - "Cleanup Only" badge for cleanup-only resources
+   - Replica count with progress bar visualization (scaling resources only)
+   - Available vs desired replicas (scaling resources only)
 
 3. **Schedule Configuration**
-   - Scale-down cron schedule
-   - Scale-up cron schedule  
+   - Scale-down cron schedule (scaling resources)
+   - Scale-up cron schedule (scaling resources)
+   - Cleanup cron schedule (cleanup-only or combined resources)
    - Configured timezone
 
 4. **Action History**
-   - Timestamp of last scale-down action
-   - Timestamp of last scale-up action
+   - Timestamp of last scale-down action (scaling resources)
+   - Timestamp of last scale-up action (scaling resources)
+   - Timestamp of last cleanup action (cleanup-only or combined resources)
 
 ### Interactive Elements
 - **Refresh Button**: Manual refresh of data
@@ -70,7 +76,7 @@ Returns a list of all CronJobScaleDown resources with their current status.
 ```json
 [
   {
-    "name": "example-cronjob",
+    "name": "example-scaling-cronjob",
     "namespace": "default",
     "targetRef": {
       "name": "my-deployment",
@@ -78,8 +84,8 @@ Returns a list of all CronJobScaleDown resources with their current status.
       "kind": "Deployment",
       "apiVersion": "apps/v1"
     },
-    "scaleDownSchedule": "0 22 * * *",
-    "scaleUpSchedule": "0 6 * * *",
+    "scaleDownSchedule": "0 0 22 * * *",
+    "scaleUpSchedule": "0 0 6 * * *",
     "timeZone": "UTC",
     "lastScaleDownTime": "2025-01-20T22:00:00Z",
     "lastScaleUpTime": "2025-01-21T06:00:00Z",
@@ -90,10 +96,22 @@ Returns a list of all CronJobScaleDown resources with their current status.
       "availableReplicas": 3,
       "readyReplicas": 3,
       "lastUpdateTime": "2025-01-21T10:30:00Z"
-    }
+    },
+    "isCleanupOnly": false
+  },
+  {
+    "name": "cleanup-only-job",
+    "namespace": "default",
+    "cleanupSchedule": "0 0 */6 * * *",
+    "timeZone": "UTC",
+    "lastCleanupTime": "2025-01-21T12:00:00Z",
+    "currentReplicas": 0,
+    "isCleanupOnly": true
   }
 ]
 ```
+
+**Note**: Cleanup-only resources will not have `targetRef` or `targetStatus` fields, and will have `isCleanupOnly: true`.
 
 ### GET /api/v1/cronjobs/{namespace}/{name}
 Returns details for a specific CronJobScaleDown resource.

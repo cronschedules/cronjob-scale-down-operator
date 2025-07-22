@@ -10,10 +10,12 @@ A Kubernetes operator that automatically scales down Deployments and StatefulSet
 - 📈 **Flexible Scaling**: Scale down and up on different schedules
 - 🎯 **Multiple Resource Types**: Supports Deployments and StatefulSets for scaling
 - 🧹 **Resource Cleanup**: Automatically delete test resources based on annotations
+- 🏷️ **Cleanup-Only Mode**: Pure cleanup functionality without scaling any target resources
 - 📊 **Status Tracking**: Monitor last execution times and current replica counts
 - 🌐 **Web UI Dashboard**: Built-in web interface to monitor all cron jobs and their status
 - ⚡ **Efficient**: Only reconciles when needed, with smart requeue timing
 - 🛡️ **Safe Testing**: Dry-run mode for cleanup operations
+- 🔧 **Graceful Error Handling**: Continues operation even when target resources are missing
 
 ## Quick Start
 
@@ -94,6 +96,73 @@ The [`examples/`](./examples/) directory contains various use cases:
 | **[statefulset-example.yaml](./examples/statefulset-example.yaml)** | Database scaling | StatefulSet support |
 | **[resource-cleanup-example.yaml](./examples/resource-cleanup-example.yaml)** | **Resource cleanup** | **Combined scaling + cleanup** |
 | **[cleanup-only-example.yaml](./examples/cleanup-only-example.yaml)** | **Cleanup only** | **Every 6 hours** |
+
+## Cleanup-Only Mode
+
+The operator supports a cleanup-only mode where it manages resource cleanup without scaling any target resources. This is perfect for environments where you need automated cleanup of test resources, temporary objects, or expired configurations.
+
+### When to Use Cleanup-Only Mode
+
+- **CI/CD Pipelines**: Automatically clean up test resources after builds
+- **Development Environments**: Remove temporary test objects on a schedule
+- **Resource Management**: Clean up expired ConfigMaps, Secrets, or test deployments
+- **Cost Optimization**: Remove unused resources to save cluster costs
+
+### Cleanup-Only Configuration
+
+```yaml
+apiVersion: cronschedules.elbazi.co/v1
+kind: CronJobScaleDown
+metadata:
+  name: cleanup-only-job
+  namespace: default
+spec:
+  # No targetRef needed for cleanup-only mode
+  cleanupSchedule: "0 0 */6 * * *"  # Every 6 hours
+  cleanupConfig:
+    annotationKey: "test.example.com/cleanup-after"
+    resourceTypes:
+      - "ConfigMap"
+      - "Secret"
+      - "Service"
+      - "Deployment"
+    namespaces:
+      - "test"
+      - "staging"
+    labelSelector:
+      environment: "test"
+    dryRun: false
+  timeZone: "UTC"
+```
+
+### Combined Scaling + Cleanup
+
+You can also combine scaling and cleanup in a single resource:
+
+```yaml
+apiVersion: cronschedules.elbazi.co/v1
+kind: CronJobScaleDown
+metadata:
+  name: combined-scaler-cleanup
+  namespace: default
+spec:
+  # Scaling configuration
+  targetRef:
+    name: my-app
+    namespace: default
+    kind: Deployment
+    apiVersion: apps/v1
+  scaleDownSchedule: "0 0 22 * * *"  # Scale down at 10 PM
+  scaleUpSchedule: "0 0 6 * * *"     # Scale up at 6 AM
+  
+  # Cleanup configuration
+  cleanupSchedule: "0 0 2 * * *"     # Clean up at 2 AM
+  cleanupConfig:
+    annotationKey: "cleanup-after"
+    resourceTypes: ["ConfigMap", "Secret"]
+    dryRun: false
+  timeZone: "UTC"
+```
 
 ## Configuration
 
