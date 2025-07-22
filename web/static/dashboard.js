@@ -109,8 +109,13 @@ class CronJobDashboard {
 
     createCronJobCard(cronJob) {
         const targetStatus = cronJob.targetStatus;
-        const statusBadge = this.getStatusBadge(targetStatus.ready, cronJob.currentReplicas);
-        const replicaBar = this.createReplicaBar(targetStatus.readyReplicas, targetStatus.desiredReplicas);
+        const isCleanupOnly = !cronJob.targetRef;
+        const statusBadge = isCleanupOnly 
+            ? '<span class="badge status-cleanup">Cleanup Only</span>'
+            : this.getStatusBadge(targetStatus?.ready, cronJob.currentReplicas);
+        const replicaBar = isCleanupOnly 
+            ? '<div class="info-item"><span class="info-value">No target resource</span></div>'
+            : this.createReplicaBar(targetStatus?.readyReplicas, targetStatus?.desiredReplicas);
         
         return `
             <div class="col-md-6 col-lg-4 mb-4">
@@ -126,17 +131,20 @@ class CronJobDashboard {
                             <h6 class="section-title">
                                 <i class="fas fa-bullseye"></i> Target Resource
                             </h6>
-                            <div class="info-item">
-                                <span class="resource-kind-badge">${cronJob.targetRef.kind}</span>
-                            </div>
-                            <div class="info-item">
-                                <span class="info-label">Name:</span>
-                                <span class="info-value">${cronJob.targetRef.name}</span>
-                            </div>
-                            <div class="info-item">
-                                <span class="info-label">Namespace:</span>
-                                <span class="info-value">${cronJob.targetRef.namespace}</span>
-                            </div>
+                            ${isCleanupOnly ? 
+                                '<div class="info-item"><span class="info-value text-muted">Cleanup-only mode - no target resource</span></div>' :
+                                `<div class="info-item">
+                                    <span class="resource-kind-badge">${cronJob.targetRef.kind}</span>
+                                </div>
+                                <div class="info-item">
+                                    <span class="info-label">Name:</span>
+                                    <span class="info-value">${cronJob.targetRef.name}</span>
+                                </div>
+                                <div class="info-item">
+                                    <span class="info-label">Namespace:</span>
+                                    <span class="info-value">${cronJob.targetRef.namespace}</span>
+                                </div>`
+                            }
                         </div>
                         
                         <hr class="section-divider">
@@ -160,14 +168,20 @@ class CronJobDashboard {
                             <h6 class="section-title">
                                 <i class="fas fa-clock"></i> Schedules
                             </h6>
-                            <div class="info-item">
-                                <span class="info-label">Scale Down:</span>
-                                ${cronJob.scaleDownSchedule ? `<span class="cron-schedule">${cronJob.scaleDownSchedule}</span>` : '<span class="text-muted">Not set</span>'}
-                            </div>
-                            <div class="info-item">
-                                <span class="info-label">Scale Up:</span>
-                                ${cronJob.scaleUpSchedule ? `<span class="cron-schedule">${cronJob.scaleUpSchedule}</span>` : '<span class="text-muted">Not set</span>'}
-                            </div>
+                            ${isCleanupOnly ? 
+                                `<div class="info-item">
+                                    <span class="info-label">Cleanup:</span>
+                                    ${cronJob.cleanupSchedule ? `<span class="cron-schedule">${cronJob.cleanupSchedule}</span>` : '<span class="text-muted">Not set</span>'}
+                                </div>` :
+                                `<div class="info-item">
+                                    <span class="info-label">Scale Down:</span>
+                                    ${cronJob.scaleDownSchedule ? `<span class="cron-schedule">${cronJob.scaleDownSchedule}</span>` : '<span class="text-muted">Not set</span>'}
+                                </div>
+                                <div class="info-item">
+                                    <span class="info-label">Scale Up:</span>
+                                    ${cronJob.scaleUpSchedule ? `<span class="cron-schedule">${cronJob.scaleUpSchedule}</span>` : '<span class="text-muted">Not set</span>'}
+                                </div>`
+                            }
                             <div class="info-item">
                                 <span class="info-label">Timezone:</span>
                                 <span class="info-value">${cronJob.timeZone}</span>
@@ -180,14 +194,20 @@ class CronJobDashboard {
                             <h6 class="section-title">
                                 <i class="fas fa-history"></i> Last Actions
                             </h6>
-                            <div class="info-item">
-                                <span class="info-label">Scale Down:</span>
-                                <div class="last-action-time">${this.formatDateTime(cronJob.lastScaleDownTime)}</div>
-                            </div>
-                            <div class="info-item">
-                                <span class="info-label">Scale Up:</span>
-                                <div class="last-action-time">${this.formatDateTime(cronJob.lastScaleUpTime)}</div>
-                            </div>
+                            ${isCleanupOnly ? 
+                                `<div class="info-item">
+                                    <span class="info-label">Last Cleanup:</span>
+                                    <div class="last-action-time">${this.formatDateTime(cronJob.lastCleanupTime)}</div>
+                                </div>` :
+                                `<div class="info-item">
+                                    <span class="info-label">Scale Down:</span>
+                                    <div class="last-action-time">${this.formatDateTime(cronJob.lastScaleDownTime)}</div>
+                                </div>
+                                <div class="info-item">
+                                    <span class="info-label">Scale Up:</span>
+                                    <div class="last-action-time">${this.formatDateTime(cronJob.lastScaleUpTime)}</div>
+                                </div>`
+                            }
                         </div>
                     </div>
                 </div>

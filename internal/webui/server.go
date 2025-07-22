@@ -24,16 +24,19 @@ type Server struct {
 }
 
 type CronJobStatus struct {
-	Name              string        `json:"name"`
-	Namespace         string        `json:"namespace"`
-	TargetRef         TargetRefInfo `json:"targetRef"`
-	ScaleDownSchedule string        `json:"scaleDownSchedule"`
-	ScaleUpSchedule   string        `json:"scaleUpSchedule"`
-	TimeZone          string        `json:"timeZone"`
-	LastScaleDownTime *time.Time    `json:"lastScaleDownTime,omitempty"`
-	LastScaleUpTime   *time.Time    `json:"lastScaleUpTime,omitempty"`
-	CurrentReplicas   int32         `json:"currentReplicas"`
-	TargetStatus      TargetStatus  `json:"targetStatus"`
+	Name              string         `json:"name"`
+	Namespace         string         `json:"namespace"`
+	TargetRef         *TargetRefInfo `json:"targetRef,omitempty"`
+	ScaleDownSchedule string         `json:"scaleDownSchedule,omitempty"`
+	ScaleUpSchedule   string         `json:"scaleUpSchedule,omitempty"`
+	CleanupSchedule   string         `json:"cleanupSchedule,omitempty"`
+	TimeZone          string         `json:"timeZone"`
+	LastScaleDownTime *time.Time     `json:"lastScaleDownTime,omitempty"`
+	LastScaleUpTime   *time.Time     `json:"lastScaleUpTime,omitempty"`
+	LastCleanupTime   *time.Time     `json:"lastCleanupTime,omitempty"`
+	CurrentReplicas   int32          `json:"currentReplicas"`
+	TargetStatus      *TargetStatus  `json:"targetStatus,omitempty"`
+	IsCleanupOnly     bool           `json:"isCleanupOnly"`
 }
 
 type TargetRefInfo struct {
@@ -144,19 +147,27 @@ func (s *Server) getCronJob(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) buildCronJobStatus(ctx context.Context, cronJob *cronschedulesv1.CronJobScaleDown) (*CronJobStatus, error) {
+	log := log.FromContext(ctx)
+
 	status := &CronJobStatus{
 		Name:              cronJob.Name,
 		Namespace:         cronJob.Namespace,
 		ScaleDownSchedule: cronJob.Spec.ScaleDownSchedule,
 		ScaleUpSchedule:   cronJob.Spec.ScaleUpSchedule,
+		CleanupSchedule:   cronJob.Spec.CleanupSchedule,
 		TimeZone:          cronJob.Spec.TimeZone,
 		CurrentReplicas:   cronJob.Status.CurrentReplicas,
-		TargetRef: TargetRefInfo{
+		IsCleanupOnly:     cronJob.Spec.TargetRef == nil && cronJob.Spec.CleanupSchedule != "",
+	}
+
+	// Handle TargetRef only if it exists (not for cleanup-only resources)
+	if cronJob.Spec.TargetRef != nil {
+		status.TargetRef = &TargetRefInfo{
 			Name:       cronJob.Spec.TargetRef.Name,
 			Namespace:  cronJob.Spec.TargetRef.Namespace,
 			Kind:       cronJob.Spec.TargetRef.Kind,
 			ApiVersion: cronJob.Spec.TargetRef.ApiVersion,
-		},
+		}
 	}
 
 	if !cronJob.Status.LastScaleDownTime.IsZero() {
@@ -165,14 +176,20 @@ func (s *Server) buildCronJobStatus(ctx context.Context, cronJob *cronschedulesv
 	if !cronJob.Status.LastScaleUpTime.IsZero() {
 		status.LastScaleUpTime = &cronJob.Status.LastScaleUpTime.Time
 	}
+	if !cronJob.Status.LastCleanupTime.IsZero() {
+		status.LastCleanupTime = &cronJob.Status.LastCleanupTime.Time
+	}
 
-	// Get target resource status
+	// Get target resource status only for scaling resources
 	if cronJob.Spec.TargetRef != nil {
 		targetStatus, err := s.getTargetStatus(ctx, *cronJob.Spec.TargetRef)
 		if err != nil {
-			return nil, fmt.Errorf("failed to get target status: %v", err)
+			// Log the error but don't fail the entire request for missing target resources
+			// This allows the web UI to show partial status even when target resources don't exist
+			log.Error(err, "Failed to get target status, skipping target status", "targetRef", cronJob.Spec.TargetRef)
+		} else {
+			status.TargetStatus = targetStatus
 		}
-		status.TargetStatus = *targetStatus
 	}
 
 	return status, nil

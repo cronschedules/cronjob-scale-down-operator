@@ -2,6 +2,10 @@
 
 This chart installs the CronJob Scale Down Operator on a Kubernetes cluster using the Helm package manager.
 
+The operator provides two main features:
+1. **Automatic Scaling**: Scale down Deployments and StatefulSets during specific time windows
+2. **Resource Cleanup**: Automatically clean up test resources based on annotations and schedules
+
 ## Prerequisites
 
 - Kubernetes 1.16+
@@ -43,7 +47,7 @@ The following table lists the configurable parameters and their default values:
 |-----------|-------------|---------|
 | `replicaCount` | Number of operator replicas | `1` |
 | `image.repository` | Container image repository | `ghcr.io/z4ck404/cronjob-scale-down-operator` |
-| `image.tag` | Container image tag | `0.1.2` |
+| `image.tag` | Container image tag | `0.3.0` |
 | `image.pullPolicy` | Image pull policy | `IfNotPresent` |
 | `serviceAccount.create` | Create service account | `true` |
 | `rbac.create` | Create RBAC resources | `true` |
@@ -56,7 +60,11 @@ The following table lists the configurable parameters and their default values:
 
 ## Usage
 
-After installation, create a CronJobScaleDown resource:
+After installation, you can create CronJobScaleDown resources for different use cases:
+
+### Automatic Scaling
+
+Scale down resources during specific time windows:
 
 ```yaml
 apiVersion: cronschedules.elbazi.co/v1
@@ -72,6 +80,55 @@ spec:
     apiVersion: apps/v1
   scaleDownSchedule: "0 0 22 * * *"  # 10 PM daily
   scaleUpSchedule: "0 0 6 * * *"     # 6 AM daily
+  timeZone: "UTC"
+```
+
+### Resource Cleanup Only
+
+Clean up test resources based on annotations:
+
+```yaml
+apiVersion: cronschedules.elbazi.co/v1
+kind: CronJobScaleDown
+metadata:
+  name: cleanup-only
+  namespace: default
+spec:
+  cleanupSchedule: "0 0 */6 * * *"    # Every 6 hours
+  cleanupConfig:
+    annotationKey: "test.elbazi.co/cleanup-after"
+    resourceTypes:
+      - "Deployment"
+      - "Service"
+      - "ConfigMap"
+    labelSelector:
+      app.kubernetes.io/created-by: "test"
+    dryRun: true  # Set to false to actually delete resources
+  timeZone: "UTC"
+```
+
+### Combined Scaling and Cleanup
+
+Use both features in one resource:
+
+```yaml
+apiVersion: cronschedules.elbazi.co/v1
+kind: CronJobScaleDown
+metadata:
+  name: combined-example
+  namespace: default
+spec:
+  targetRef:
+    name: my-deployment
+    namespace: default
+    kind: Deployment
+  scaleDownSchedule: "0 0 22 * * *"  # 10 PM daily
+  scaleUpSchedule: "0 0 6 * * *"     # 6 AM daily
+  cleanupSchedule: "0 0 2 * * *"     # 2 AM daily
+  cleanupConfig:
+    annotationKey: "test.elbazi.co/cleanup-after"
+    resourceTypes: ["ConfigMap", "Secret"]
+    dryRun: false
   timeZone: "UTC"
 ```
 

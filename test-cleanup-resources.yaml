@@ -1,0 +1,75 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: test-cleanup
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: test-config-old
+  namespace: test-cleanup
+  annotations:
+    test.elbazi.co/cleanup-after: "2024-01-01T00:00:00Z"
+  labels:
+    app: test-app
+data:
+  config: "old configuration"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: test-config-recent
+  namespace: test-cleanup
+  annotations:
+    test.elbazi.co/cleanup-after: "2030-01-01T00:00:00Z"
+  labels:
+    app: test-app
+data:
+  config: "recent configuration"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: test-secret-old
+  namespace: test-cleanup
+  annotations:
+    test.elbazi.co/cleanup-after: "2024-01-01T00:00:00Z"
+  labels:
+    app: test-app
+type: Opaque
+data:
+  password: dGVzdC1wYXNzd29yZA==
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: test-service-old
+  namespace: test-cleanup
+  annotations:
+    test.elbazi.co/cleanup-after: "2024-01-01T00:00:00Z"
+  labels:
+    app: test-app
+spec:
+  selector:
+    app: test-app
+  ports:
+  - port: 80
+    targetPort: 8080
+---
+apiVersion: cronschedules.elbazi.co/v1
+kind: CronJobScaleDown
+metadata:
+  name: cleanup-only-test
+  namespace: default
+spec:
+  cleanupSchedule: "0 */2 * * * *"  # Every 2 minutes for testing (with seconds field)
+  cleanupConfig:
+    annotationKey: "test.elbazi.co/cleanup-after"
+    resourceTypes:
+      - "ConfigMap"
+      - "Secret"
+      - "Service"
+    labelSelector:
+      app: test-app
+    dryRun: false  # Actually delete the resources
+  timeZone: "UTC"

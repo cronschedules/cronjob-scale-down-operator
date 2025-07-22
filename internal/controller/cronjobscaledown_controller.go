@@ -25,6 +25,7 @@ import (
 
 	"github.com/go-logr/logr"
 	"github.com/robfig/cron/v3"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -41,6 +42,15 @@ var (
 	// Maximum schedule length to prevent extremely long schedules
 	maxScheduleLength = 100
 )
+
+//+kubebuilder:rbac:groups=cronschedules.elbazi.co,resources=cronjobscaledowns,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=cronschedules.elbazi.co,resources=cronjobscaledowns/status,verbs=get;update;patch
+//+kubebuilder:rbac:groups=cronschedules.elbazi.co,resources=cronjobscaledowns/finalizers,verbs=update
+//+kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;update;patch
+//+kubebuilder:rbac:groups=apps,resources=statefulsets,verbs=get;list;watch;update;patch
+//+kubebuilder:rbac:groups="",resources=services,verbs=get;list;delete
+//+kubebuilder:rbac:groups="",resources=configmaps,verbs=get;list;delete
+//+kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;delete
 
 // CronJobScaleDownReconciler reconciles a CronJobScaleDown object
 type CronJobScaleDownReconciler struct {
@@ -336,23 +346,33 @@ func (r *CronJobScaleDownReconciler) executeScaling(ctx context.Context, k8sClie
 	if r.shouldScaleDown(cronJobScaleDown, now) {
 		logger.Info("Scaling down the target resource")
 		if err := k8sClient.ScaleDownTargetResource(ctx, utils.TargetObject{TargetRef: *cronJobScaleDown.Spec.TargetRef}); err != nil {
-			logger.Error(err, "Error scaling down target resource")
-			return false, err
+			if apierrors.IsNotFound(err) {
+				logger.Info("Target resource not found for scale down, skipping", "error", err.Error())
+			} else {
+				logger.Error(err, "Error scaling down target resource")
+				return false, err
+			}
+		} else {
+			cronJobScaleDown.Status.LastScaleDownTime = metav1.Time{Time: now}
+			r.updateCurrentReplicas(ctx, k8sClient, cronJobScaleDown)
+			didScale = true
 		}
-		cronJobScaleDown.Status.LastScaleDownTime = metav1.Time{Time: now}
-		r.updateCurrentReplicas(ctx, k8sClient, cronJobScaleDown)
-		didScale = true
 	}
 
 	if r.shouldScaleUp(cronJobScaleDown, now) {
 		logger.Info("Scaling up the target resource")
 		if err := k8sClient.ScaleUpTargetResource(ctx, utils.TargetObject{TargetRef: *cronJobScaleDown.Spec.TargetRef}); err != nil {
-			logger.Error(err, "Error scaling up target resource")
-			return false, err
+			if apierrors.IsNotFound(err) {
+				logger.Info("Target resource not found for scale up, skipping", "error", err.Error())
+			} else {
+				logger.Error(err, "Error scaling up target resource")
+				return false, err
+			}
+		} else {
+			cronJobScaleDown.Status.LastScaleUpTime = metav1.Time{Time: now}
+			r.updateCurrentReplicas(ctx, k8sClient, cronJobScaleDown)
+			didScale = true
 		}
-		cronJobScaleDown.Status.LastScaleUpTime = metav1.Time{Time: now}
-		r.updateCurrentReplicas(ctx, k8sClient, cronJobScaleDown)
-		didScale = true
 	}
 
 	return didScale, nil
