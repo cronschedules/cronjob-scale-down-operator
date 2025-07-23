@@ -28,20 +28,27 @@ A Kubernetes operator that automatically scales down Deployments and StatefulSet
 
 #### Option 1: Using Helm (Recommended)
 
-1. **Install using Helm:**
+#### Option 1: Using Helm (Recommended)
+
+**📦 Helm charts have been migrated to a dedicated repository for better management.**
+
+1. **Add the charts repository:**
    ```bash
-   # Clone the repository
-   git clone https://github.com/z4ck404/cronjob-scale-down-operator.git
-   cd cronjob-scale-down-operator
-   
-   # Install the operator
-   helm install cronjob-scale-down-operator ./charts/cronjob-scale-down-operator
+   helm repo add cronschedules https://cronschedules.github.io/charts
+   helm repo update
    ```
 
-2. **Verify installation:**
+2. **Install the operator:**
+   ```bash
+   helm install cronjob-scale-down-operator cronschedules/cronjob-scale-down-operator
+   ```
+
+3. **Verify installation:**
    ```bash
    kubectl get pods -l app.kubernetes.io/name=cronjob-scale-down-operator
    ```
+
+> **📖 Chart Documentation:** For detailed Helm chart documentation, values, and configuration options, visit the [Charts Repository](https://github.com/cronschedules/charts/tree/main/cronjob-scale-down-operator).
 
 #### Option 2: Using Container Image
 
@@ -237,24 +244,24 @@ The operator can be installed using Helm for easier management and configuration
 
 ### Installation Steps
 
-1. **Clone and install:**
+1. **Add repository and install:**
    ```bash
-   git clone https://github.com/z4ck404/cronjob-scale-down-operator.git
-   cd cronjob-scale-down-operator
-   helm install cronjob-scale-down-operator ./charts/cronjob-scale-down-operator
+   helm repo add cronschedules https://cronschedules.github.io/charts
+   helm repo update
+   helm install cronjob-scale-down-operator cronschedules/cronjob-scale-down-operator
    ```
 
 2. **Custom values:**
    ```bash
-   helm install cronjob-scale-down-operator ./charts/cronjob-scale-down-operator \
-     --set image.tag=0.1.2 \
+   helm install cronjob-scale-down-operator cronschedules/cronjob-scale-down-operator \
+     --set image.tag=0.3.0 \
      --set resources.requests.memory=128Mi \
      --set replicaCount=1
    ```
 
 3. **Upgrade:**
    ```bash
-   helm upgrade cronjob-scale-down-operator ./charts/cronjob-scale-down-operator
+   helm upgrade cronjob-scale-down-operator cronschedules/cronjob-scale-down-operator
    ```
 
 4. **Uninstall:**

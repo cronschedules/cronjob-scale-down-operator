@@ -68,8 +68,12 @@ curl http://localhost:8082/api/v1/cronjobs/default/your-cronjob-name
 Alternatively, you can test using Helm:
 
 ```bash
+# Add the charts repository
+helm repo add cronschedules https://cronschedules.github.io/charts
+helm repo update
+
 # Install with Web UI enabled
-helm install test-operator ./charts/cronjob-scale-down-operator \
+helm install test-operator cronschedules/cronjob-scale-down-operator \
   --set webui.enabled=true
 
 # Port forward to access the web UI
@@ -87,7 +91,7 @@ kubectl port-forward deployment/test-operator-cronjob-scale-down-operator 8082:8
 ./bin/manager --webui-addr=:8080
 
 # Or in Helm
-helm install test-operator ./charts/cronjob-scale-down-operator \
+helm install test-operator cronschedules/cronjob-scale-down-operator \
   --set webui.service.port=8080
 ```
 

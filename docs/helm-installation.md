@@ -17,13 +17,21 @@ git clone https://github.com/z4ck404/cronjob-scale-down-operator.git
 cd cronjob-scale-down-operator
 ```
 
-### Step 2: Install the Chart
+### Step 2: Add the Helm Repository
 
 ```bash
-helm install cronjob-scale-down-operator ./charts/cronjob-scale-down-operator
+# Add the charts repository
+helm repo add cronschedules https://cronschedules.github.io/charts
+helm repo update
 ```
 
-### Step 3: Verify Installation
+### Step 3: Install the Chart
+
+```bash
+helm install cronjob-scale-down-operator cronschedules/cronjob-scale-down-operator
+```
+
+### Step 4: Verify Installation
 
 ```bash
 # Check if the operator is running
@@ -61,7 +69,7 @@ nodeSelector:
 Install with custom values:
 
 ```bash
-helm install cronjob-scale-down-operator ./charts/cronjob-scale-down-operator -f values.yaml
+helm install cronjob-scale-down-operator cronschedules/cronjob-scale-down-operator -f values.yaml
 ```
 
 ### Install in Custom Namespace
@@ -71,14 +79,14 @@ helm install cronjob-scale-down-operator ./charts/cronjob-scale-down-operator -f
 kubectl create namespace cronjob-operator
 
 # Install in custom namespace
-helm install cronjob-scale-down-operator ./charts/cronjob-scale-down-operator \
+helm install cronjob-scale-down-operator cronschedules/cronjob-scale-down-operator \
   --namespace cronjob-operator
 ```
 
 ### Install with Inline Values
 
 ```bash
-helm install cronjob-scale-down-operator ./charts/cronjob-scale-down-operator \
+helm install cronjob-scale-down-operator cronschedules/cronjob-scale-down-operator \
   --set image.tag=0.1.2 \
   --set replicaCount=2 \
   --set resources.requests.memory=128Mi
@@ -111,10 +119,10 @@ helm install cronjob-scale-down-operator ./charts/cronjob-scale-down-operator \
 
 ```bash
 # Upgrade to latest version
-helm upgrade cronjob-scale-down-operator ./charts/cronjob-scale-down-operator
+helm upgrade cronjob-scale-down-operator cronschedules/cronjob-scale-down-operator
 
 # Upgrade with new values
-helm upgrade cronjob-scale-down-operator ./charts/cronjob-scale-down-operator -f values.yaml
+helm upgrade cronjob-scale-down-operator cronschedules/cronjob-scale-down-operator -f values.yaml
 ```
 
 ### Check Status
@@ -165,6 +173,9 @@ helm uninstall cronjob-scale-down-operator --namespace cronjob-operator
 
 3. **Chart validation errors:**
    ```bash
+   # For local development, clone the charts repository first:
+   # git clone https://github.com/cronschedules/charts.git
+   
    # Validate chart syntax
    helm lint ./charts/cronjob-scale-down-operator
    
@@ -175,7 +186,8 @@ helm uninstall cronjob-scale-down-operator --namespace cronjob-operator
 ### Debug Commands
 
 ```bash
-# Render templates locally
+# Render templates locally (requires charts repository)
+# git clone https://github.com/cronschedules/charts.git
 helm template cronjob-scale-down-operator ./charts/cronjob-scale-down-operator
 
 # Get rendered values
