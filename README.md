@@ -29,20 +29,33 @@ A Kubernetes operator that automatically scales down Deployments and StatefulSet
 
 #### Option 1: Using Helm (Recommended)
 
-1. **Install using Helm:**
+**📦 Helm charts have been migrated to a dedicated repository for better management.**
+
+1. **Add the charts repository:**
    ```bash
-   # Clone the repository
-   git clone https://github.com/z4ck404/cronjob-scale-down-operator.git
-   cd cronjob-scale-down-operator
-   
-   # Install the operator
-   helm install cronjob-scale-down-operator ./charts/cronjob-scale-down-operator
+   helm repo add cronschedules https://cronschedules.github.io/charts
+   helm repo update
    ```
 
-2. **Verify installation:**
+2. **Install the operator:**
+   ```bash
+   helm install cronjob-scale-down-operator cronschedules/cronjob-scale-down-operator
+   ```
+
+3. **Install with custom values:**
+   ```bash
+   helm install cronjob-scale-down-operator cronschedules/cronjob-scale-down-operator \
+     --set image.tag=0.3.0 \
+     --set webUI.enabled=true \
+     --set resources.requests.memory=128Mi
+   ```
+
+4. **Verify installation:**
    ```bash
    kubectl get pods -l app.kubernetes.io/name=cronjob-scale-down-operator
    ```
+
+> **📖 Chart Documentation:** For detailed Helm chart documentation, values, and configuration options, visit the [Charts Repository](https://github.com/cronschedules/charts/tree/main/cronjob-scale-down-operator).
 
 #### Option 2: Using Container Image
 
@@ -81,6 +94,46 @@ Use this image in your custom deployments or with the provided Helm chart.
    kubectl get cronjobscaledown -w
    kubectl get deployment nginx-test -w
    ```
+
+## 📦 Charts Repository Migration
+
+**Important Notice: Helm charts have been migrated to a dedicated repository for better management and hosting.**
+
+### Migration Details
+
+- **Previous Location**: Charts were located in `/charts` directory of this repository
+- **New Location**: [cronschedules/charts](https://github.com/cronschedules/charts) repository
+- **Helm Repository URL**: `https://cronschedules.github.io/charts`
+
+### Benefits of Migration
+  
+✅ **Centralized Management**: All charts in one dedicated repository  
+✅ **Proper Hosting**: GitHub Pages hosting for Helm repository  
+✅ **Improved CI/CD**: Better error handling and comprehensive testing  
+✅ **Security**: Automated security scanning with Checkov  
+✅ **Standards**: Following Helm chart repository best practices  
+✅ **Automation**: Fully automated releases and index updates  
+
+### For Existing Users
+
+If you were using the old chart location, please update your installation:
+
+```bash
+# Old way (deprecated)
+# helm install cronjob-scale-down-operator ./charts/cronjob-scale-down-operator
+
+# New way (recommended)
+helm repo add cronschedules https://cronschedules.github.io/charts
+helm repo update
+helm install cronjob-scale-down-operator cronschedules/cronjob-scale-down-operator
+```
+
+### Chart Documentation
+
+For comprehensive chart documentation, configuration options, values, and advanced usage:
+- 📖 [Chart Repository](https://github.com/cronschedules/charts)
+- 📋 [Chart README](https://github.com/cronschedules/charts/tree/main/cronjob-scale-down-operator)
+- ⚙️ [Configuration Values](https://github.com/cronschedules/charts/blob/main/cronjob-scale-down-operator/values.yaml)
 
 ## Examples
 
