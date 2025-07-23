@@ -10,7 +10,7 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: z4ck404/cronjob-scale-down-operator
+  IMAGE_NAME: cronschedules/cronjob-scale-down-operator
   IMAGE_TAG: 0.1.0
 
 jobs:
