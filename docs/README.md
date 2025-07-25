@@ -1,52 +1,164 @@
-# CronJob-Scale-Down-Operator
+# CronJob Scale Down Operator
 
-A Kubernetes operator that automatically scales down Deployments and StatefulSets during specific time windows (e.g., at night or on weekends) to save resources and costs.
+Kubernetes operator for scheduled scaling of Deployments and StatefulSets.
 
 ## Features
 
-- 🕒 **Cron-based Scheduling**: Uses standard cron expressions with second precision
-- 🌍 **Timezone Support**: Configure schedules in any timezone
-- 📈 **Flexible Scaling**: Scale down and up on different schedules
-- 🎯 **Multiple Resource Types**: Supports Deployments and StatefulSets for scaling
-- 🧹 **Resource Cleanup**: Automatically delete test resources based on annotations
-- 🏷️ **Cleanup-Only Mode**: Pure cleanup functionality without scaling any target resources
-- 📊 **Status Tracking**: Monitor last execution times and current replica counts
-- 🌐 **Web UI Dashboard**: Built-in web interface to monitor all cron jobs and their status
-- ⚡ **Efficient**: Only reconciles when needed, with smart requeue timing
-- 🛡️ **Safe Testing**: Dry-run mode for cleanup operations
-- 🔧 **Graceful Error Handling**: Continues operation even when target resources are missing
+- Cron-based scheduling with second precision
+- Timezone support
+- Scale down/up on different schedules
+- Supports Deployments and StatefulSets
+- Resource cleanup based on annotations
+- Cleanup-only mode (no scaling target)
+- Status tracking
+- Web UI dashboard
+- Dry-run mode for testing
 
-## Quick Start
+## Installation
 
-### Prerequisites
+### Helm (Recommended)
 
-- Kubernetes cluster (v1.16+)
-- kubectl configured
-- Cluster admin permissions
+```bash
+helm repo add cronschedules https://cronschedules.github.io/charts
+helm repo update
+helm install cronjob-scale-down-operator cronschedules/cronjob-scale-down-operator
+```
 
-### Installation
+### Manual
 
-#### Option 1: Using Helm (Recommended)
+```bash
+kubectl apply -f https://github.com/z4ck404/cronjob-scale-down-operator/releases/latest/download/install.yaml
+```
 
-#### Option 1: Using Helm (Recommended)
+## Quick Test
 
-**📦 Helm charts have been migrated to a dedicated repository for better management.**
-
-1. **Add the charts repository:**
+1. **Create test deployment:**
    ```bash
-   helm repo add cronschedules https://cronschedules.github.io/charts
-   helm repo update
+   kubectl apply -f examples/test-deployment.yaml
    ```
 
-2. **Install the operator:**
+2. **Apply scaling schedule:**
    ```bash
-   helm install cronjob-scale-down-operator cronschedules/cronjob-scale-down-operator
+   kubectl apply -f examples/quick-test.yaml
    ```
 
-3. **Verify installation:**
+3. **Monitor:**
    ```bash
-   kubectl get pods -l app.kubernetes.io/name=cronjob-scale-down-operator
+   kubectl get cronjobscaledown -w
    ```
+
+## Basic Usage
+
+### Simple Scaling
+
+```yaml
+apiVersion: cronschedules.elbazi.co/v1
+kind: CronJobScaleDown
+metadata:
+  name: nightly-scaling
+spec:
+  targetRef:
+    name: my-deployment
+    kind: Deployment
+    apiVersion: apps/v1
+  scaleDownSchedule: "0 0 22 * * *"  # 10 PM
+  scaleUpSchedule: "0 0 8 * * *"     # 8 AM
+  timeZone: "America/New_York"
+```
+
+### Cleanup Only
+
+```yaml
+apiVersion: cronschedules.elbazi.co/v1
+kind: CronJobScaleDown
+metadata:
+  name: cleanup-job
+spec:
+  cleanupSchedule: "0 0 2 * * *"  # 2 AM daily
+  cleanupConfig:
+    annotationKey: "test.example.com/cleanup-after"
+    resourceTypes: ["ConfigMap", "Secret", "Pod"]
+```
+
+### Combined Scaling + Cleanup
+
+```yaml
+apiVersion: cronschedules.elbazi.co/v1
+kind: CronJobScaleDown
+metadata:
+  name: full-management
+spec:
+  targetRef:
+    name: my-app
+    kind: Deployment
+    apiVersion: apps/v1
+  scaleDownSchedule: "0 0 18 * * *"
+  scaleUpSchedule: "0 0 9 * * *"
+  cleanupSchedule: "0 0 1 * * *"
+  cleanupConfig:
+    annotationKey: "test.example.com/cleanup-after"
+    resourceTypes: ["ConfigMap", "Secret"]
+  timeZone: "UTC"
+```
+
+## Configuration
+
+### Schedule Format
+
+Uses standard cron with seconds:
+```
+# ┌───────────── second (0 - 59)
+# │ ┌───────────── minute (0 - 59)
+# │ │ ┌───────────── hour (0 - 23)
+# │ │ │ ┌───────────── day of month (1 - 31)
+# │ │ │ │ ┌───────────── month (1 - 12)
+# │ │ │ │ │ ┌───────────── day of week (0 - 6)
+# │ │ │ │ │ │
+# * * * * * *
+```
+
+Examples:
+- `0 0 22 * * *` - Daily at 10 PM
+- `0 0 18 * * 1-5` - Weekdays at 6 PM
+- `0 0 9 * * 1` - Mondays at 9 AM
+
+### Timezones
+
+Supports all IANA timezone names:
+- `UTC`
+- `America/New_York`
+- `Europe/London`
+- `Asia/Tokyo`
+
+## Status Monitoring
+
+```bash
+# Check status
+kubectl get cronjobscaledown
+
+# Detailed view
+kubectl describe cronjobscaledown my-job
+
+# Watch for changes
+kubectl get cronjobscaledown -w
+```
+
+## Web UI
+
+Access the dashboard at http://localhost:8082 (when running locally) or configure ingress for production.
+
+```bash
+# Enable in Helm
+helm install cronjob-scale-down-operator cronschedules/cronjob-scale-down-operator \
+  --set webui.enabled=true
+```
+
+## Documentation
+
+- [Helm Installation](helm-installation.md)
+- [Web UI Guide](webui.md)
+- [Cleanup Feature](cleanup.md)
+- [Charts Migration](charts-migration.md)
 
 > **📖 Chart Documentation:** For detailed Helm chart documentation, values, and configuration options, visit the [Charts Repository](https://github.com/cronschedules/charts/tree/main/cronjob-scale-down-operator).
 
@@ -56,7 +168,7 @@ The operator is available as a pre-built container image:
 
 ```bash
 # Image available at:
-docker pull ghcr.io/z4ck404/cronjob-scale-down-operator:0.1.2
+docker pull ghcr.io/z4ck404/cronjob-scale-down-operator:0.3.0
 ```
 
 Use this image in your custom deployments or with the provided Helm chart.
@@ -239,8 +351,8 @@ The operator can be installed using Helm for easier management and configuration
 ### Chart Information
 
 - **Repository**: `ghcr.io/z4ck404/cronjob-scale-down-operator`
-- **Image Tag**: `0.1.2`
-- **Chart Version**: `0.1.2`
+- **Image Tag**: `0.3.0`
+- **Chart Version**: `0.3.0`
 
 ### Installation Steps
 
@@ -276,7 +388,7 @@ Key Helm chart values:
 | Parameter | Description | Default |
 |-----------|-------------|---------|
 | `image.repository` | Container image repository | `ghcr.io/z4ck404/cronjob-scale-down-operator` |
-| `image.tag` | Container image tag | `0.1.2` |
+| `image.tag` | Container image tag | `0.3.0` |
 | `replicaCount` | Number of operator replicas | `1` |
 | `resources.limits.memory` | Memory limit | `128Mi` |
 | `resources.requests.cpu` | CPU request | `10m` |

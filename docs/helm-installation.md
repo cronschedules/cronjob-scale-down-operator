@@ -1,56 +1,127 @@
-# Helm Installation Guide
+# Helm Installation
 
-This guide explains how to install the CronJob Scale Down Operator using Helm.
+Install the CronJob Scale Down Operator using Helm.
 
 ## Prerequisites
 
 - Kubernetes cluster (v1.16+)
 - Helm 3.0+
-- kubectl configured with cluster admin permissions
+- kubectl configured
 
 ## Installation
 
-### Step 1: Clone the Repository
-
 ```bash
-git clone https://github.com/z4ck404/cronjob-scale-down-operator.git
-cd cronjob-scale-down-operator
-```
-
-### Step 2: Add the Helm Repository
-
-```bash
-# Add the charts repository
+# Add repository
 helm repo add cronschedules https://cronschedules.github.io/charts
 helm repo update
-```
 
-### Step 3: Install the Chart
-
-```bash
+# Install
 helm install cronjob-scale-down-operator cronschedules/cronjob-scale-down-operator
-```
 
-### Step 4: Verify Installation
-
-```bash
-# Check if the operator is running
+# Verify
 kubectl get pods -l app.kubernetes.io/name=cronjob-scale-down-operator
-
-# Check if CRDs are installed
 kubectl get crd cronjobscaledowns.cronschedules.elbazi.co
 ```
 
 ## Custom Configuration
 
-### Override Default Values
+### Override Values
 
-Create a `values.yaml` file:
+Create `values.yaml`:
+
+```yaml
+image:
+  tag: "0.3.0"
+replicaCount: 2
+resources:
+  requests:
+    memory: "128Mi"
+    cpu: "100m"
+webui:
+  enabled: true
+```
+
+```bash
+helm install cronjob-scale-down-operator cronschedules/cronjob-scale-down-operator -f values.yaml
+```
+
+### Command Line Options
+
+```bash
+helm install cronjob-scale-down-operator cronschedules/cronjob-scale-down-operator \
+  --set image.tag=0.3.0 \
+  --set replicaCount=2 \
+  --set resources.requests.memory=128Mi
+```
+
+### Custom Namespace
+
+```bash
+helm install cronjob-scale-down-operator cronschedules/cronjob-scale-down-operator \
+  --namespace cronjob-operator \
+  --create-namespace
+```
+
+## Upgrade
+
+```bash
+# Upgrade to latest
+helm upgrade cronjob-scale-down-operator cronschedules/cronjob-scale-down-operator
+
+# Upgrade with values
+helm upgrade cronjob-scale-down-operator cronschedules/cronjob-scale-down-operator -f values.yaml
+```
+
+## Status
+
+```bash
+# Check release status
+helm status cronjob-scale-down-operator
+
+# List releases
+helm list
+```
+
+## Uninstall
+
+```bash
+helm uninstall cronjob-scale-down-operator
+```
+
+## Local Development
+
+For local chart development:
+
+```bash
+# Clone charts repository
+git clone https://github.com/cronschedules/charts.git
+
+# Lint chart
+helm lint ./charts/cronjob-scale-down-operator
+
+# Dry run
+helm install cronjob-scale-down-operator ./charts/cronjob-scale-down-operator --dry-run
+
+# Template rendering
+helm template cronjob-scale-down-operator ./charts/cronjob-scale-down-operator
+```
+
+## Troubleshooting
+
+**Installation fails:**
+- Check Kubernetes version compatibility
+- Verify RBAC permissions
+- Check resource quotas
+
+**Pods not starting:**
+- Check image pull policy
+- Verify resource requests/limits
+- Check node capacity
 
 ```yaml
 # Custom values for cronjob-scale-down-operator
 image:
-  tag: "0.1.2"
+  tag: "0.3.0"
 
 resources:
   limits:
@@ -87,7 +158,7 @@ helm install cronjob-scale-down-operator cronschedules/cronjob-scale-down-operat
 
 ```bash
 helm install cronjob-scale-down-operator cronschedules/cronjob-scale-down-operator \
-  --set image.tag=0.1.2 \
+  --set image.tag=0.3.0 \
   --set replicaCount=2 \
   --set resources.requests.memory=128Mi
 ```
@@ -97,7 +168,7 @@ helm install cronjob-scale-down-operator cronschedules/cronjob-scale-down-operat
 | Parameter | Description | Default |
 |-----------|-------------|---------|
 | `image.repository` | Container image repository | `ghcr.io/z4ck404/cronjob-scale-down-operator` |
-| `image.tag` | Container image tag | `0.1.2` |
+| `image.tag` | Container image tag | `0.3.0` |
 | `image.pullPolicy` | Image pull policy | `IfNotPresent` |
 | `replicaCount` | Number of operator replicas | `1` |
 | `serviceAccount.create` | Create service account | `true` |
