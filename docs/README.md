@@ -164,14 +164,17 @@ helm install cronjob-scale-down-operator cronschedules/cronjob-scale-down-operat
 
 #### Option 2: Using Container Image
 
-The operator is available as a pre-built container image:
+The operator is available as a pre-built container image from multiple registries:
 
 ```bash
-# Image available at:
-docker pull ghcr.io/z4ck404/cronjob-scale-down-operator:0.3.0
+# From Docker Hub:
+docker pull cronschedules/cronjob-scale-down-operator:0.3.0
+
+# From GitHub Container Registry:
+docker pull ghcr.io/cronschedules/cronjob-scale-down-operator:0.3.0
 ```
 
-Use this image in your custom deployments or with the provided Helm chart.
+Use these images in your custom deployments or with the provided Helm chart.
 
 #### Option 3: Using kubectl
 
@@ -350,7 +353,7 @@ The operator can be installed using Helm for easier management and configuration
 
 ### Chart Information
 
-- **Repository**: `ghcr.io/z4ck404/cronjob-scale-down-operator`
+- **Repository**: `ghcr.io/cronschedules/cronjob-scale-down-operator` or `cronschedules/cronjob-scale-down-operator` (Docker Hub)
 - **Image Tag**: `0.3.0`
 - **Chart Version**: `0.3.0`
 
@@ -387,7 +390,7 @@ Key Helm chart values:
 
 | Parameter | Description | Default |
 |-----------|-------------|---------|
-| `image.repository` | Container image repository | `ghcr.io/z4ck404/cronjob-scale-down-operator` |
+| `image.repository` | Container image repository | `ghcr.io/cronschedules/cronjob-scale-down-operator` |
 | `image.tag` | Container image tag | `0.3.0` |
 | `replicaCount` | Number of operator replicas | `1` |
 | `resources.limits.memory` | Memory limit | `128Mi` |
