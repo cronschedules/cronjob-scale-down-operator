@@ -1,13 +1,27 @@
-name: Create Release
+name: Create Release and Push Multi-Arch Images
 
 on:
   push:
     branches:
       - main
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag'
+        required: true
+        default: 'latest'
+
+env:
+  REGISTRY: ghcr.io
+  DOCKERHUB_REGISTRY: docker.io
+  IMAGE_NAME: cronschedules/cronjob-scale-down-operator
 
 jobs:
   create-release:
     runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     permissions:
       contents: write
     
@@ -31,9 +45,74 @@ jobs:
         id: create_release
         uses: softprops/action-gh-release@c062e08bd532815e2082a85e87e3ef29c3e6d191 # v2.0.8
         with:
-          name: Release ${{ env.VERSION }}
-          tag_name: v${{ env.VERSION }}
+          name: Release ${{ steps.get_version.outputs.version }}
+          tag_name: v${{ steps.get_version.outputs.version }}
           draft: false
           prerelease: false
           generate_release_notes: true
           token: ${{ secrets.GITHUB_TOKEN }}
+
+  build-and-push-multiarch:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'release' || github.event_name == 'workflow_dispatch'
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+
+      - name: Set up Go
+        uses: actions/setup-go@0a12ed9d6a96ab950c8f026ed9f722fe0da7ef32 # v5.0.2
+        with:
+          go-version-file: 'go.mod'
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@9780b0c442fbb1117ed29e0efdff1e18412f7567 # v3.3.0
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@9780b0c442fbb1117ed29e0efdff1e18412f7567 # v3.3.0
+        with:
+          registry: ${{ env.DOCKERHUB_REGISTRY }}
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Get release tag
+        id: get_tag
+        run: |
+          if [ "${{ github.event_name }}" = "release" ]; then
+            TAG=${GITHUB_REF#refs/tags/}
+            echo "IMAGE_TAG=$TAG" >> $GITHUB_ENV
+            echo "tag=$TAG" >> $GITHUB_OUTPUT
+          else
+            TAG="${{ github.event.inputs.tag }}"
+            echo "IMAGE_TAG=$TAG" >> $GITHUB_ENV
+            echo "tag=$TAG" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@988b5a0280414f521da01fcc63a27aeeb4b104db # v3.6.1
+
+      - name: Build and push multi-arch Docker images
+        run: |
+          make docker-buildx-all
+        env:
+          IMAGE_TAG: ${{ steps.get_tag.outputs.tag }}
+          PLATFORMS: linux/amd64,linux/arm64
+
+      - name: Update latest tags for releases
+        if: github.event_name == 'release'
+        run: |
+          # Tag and push latest to both registries
+          docker buildx imagetools create \
+            --tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest \
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.get_tag.outputs.tag }}
+          
+          docker buildx imagetools create \
+            --tag ${{ env.DOCKERHUB_REGISTRY }}/${{ env.IMAGE_NAME }}:latest \
+            ${{ env.DOCKERHUB_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.get_tag.outputs.tag }}

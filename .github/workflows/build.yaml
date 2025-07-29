@@ -4,18 +4,47 @@ on:
   push:
     branches:
       - main
+    tags:
+      - 'v*'
   pull_request:
     branches:
       - main
 
 env:
   REGISTRY: ghcr.io
+  DOCKERHUB_REGISTRY: docker.io
   IMAGE_NAME: cronschedules/cronjob-scale-down-operator
-  IMAGE_TAG: 0.1.0
 
 jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+
+      - name: Get the version
+        id: get_version
+        run: |
+          VERSION=$(cat VERSION)
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@988b5a0280414f521da01fcc63a27aeeb4b104db # v3.6.1
+
+      - name: Build Docker image (no push)
+        run: |
+          make docker-build
+        env:
+          IMAGE_TAG: ${{ steps.get_version.outputs.version }}
+
   build-and-push:
     runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     permissions:
       contents: read
       packages: write
@@ -30,17 +59,27 @@ jobs:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@9780b0c442fbb1117ed29e0efdff1e18412f7567 # v3.3.0
+        with:
+          registry: ${{ env.DOCKERHUB_REGISTRY }}
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
       
       - name: Get the version
+        id: get_version_push
         run: |
-          echo "VERSION=$(cat VERSION)" >> $GITHUB_ENV
+          VERSION=$(cat VERSION)
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@988b5a0280414f521da01fcc63a27aeeb4b104db # v3.6.1
 
-      - name: Build and push Docker image
+      - name: Build and push Docker image to both registries
         run: |
           make docker-build
-          make docker-push
+          make docker-push-all
         env:
-          IMAGE_TAG: ${{ env.VERSION }}
+          IMAGE_TAG: ${{ steps.get_version_push.outputs.version }}

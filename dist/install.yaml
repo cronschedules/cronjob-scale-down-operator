@@ -399,7 +399,7 @@ spec:
         - --health-probe-bind-address=:8081
         command:
         - /manager
-        image: ghcr.io/z4ck404/cronjob-scale-down-operator:latest
+        image: ghcr.io/cronschedules/cronjob-scale-down-operator:latest
         livenessProbe:
           httpGet:
             path: /healthz

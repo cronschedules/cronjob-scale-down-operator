@@ -59,14 +59,17 @@ A Kubernetes operator that automatically scales down Deployments and StatefulSet
 
 #### Option 2: Using Container Image
 
-The operator is available as a pre-built container image:
+The operator is available as a pre-built container image from multiple registries:
 
 ```bash
-# Image available at:
-docker pull ghcr.io/z4ck404/cronjob-scale-down-operator:0.1.2
+# From Docker Hub:
+docker pull cronschedules/cronjob-scale-down-operator:0.3.0
+
+# From GitHub Container Registry:
+docker pull ghcr.io/cronschedules/cronjob-scale-down-operator:0.3.0
 ```
 
-Use this image in your custom deployments or with the provided Helm chart.
+Use these images in your custom deployments or with the provided Helm chart.
 
 #### Option 3: Using kubectl
 

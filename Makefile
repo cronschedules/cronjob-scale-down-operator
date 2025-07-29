@@ -1,8 +1,13 @@
 # Image URL to use all building/pushing image targets
-REGISTRY ?=
-IMAGE_NAME ?= 
-IMAGE_TAG ?= 
+REGISTRY ?= ghcr.io
+IMAGE_NAME ?= cronschedules/cronjob-scale-down-operator
+IMAGE_TAG ?= latest
 IMG ?= ${REGISTRY}/${IMAGE_NAME}:$(IMAGE_TAG)
+
+# Docker Hub configuration
+DOCKERHUB_REGISTRY ?= docker.io
+DOCKERHUB_IMAGE_NAME ?= cronschedules/cronjob-scale-down-operator
+DOCKERHUB_IMG ?= ${DOCKERHUB_REGISTRY}/${DOCKERHUB_IMAGE_NAME}:$(IMAGE_TAG)
 
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
 ifeq (,$(shell go env GOBIN))
@@ -114,6 +119,14 @@ docker-build: ## Build docker image with the manager.
 docker-push: ## Push docker image with the manager.
 	$(CONTAINER_TOOL) push ${IMG}
 
+.PHONY: docker-push-dockerhub
+docker-push-dockerhub: ## Push docker image to Docker Hub.
+	$(CONTAINER_TOOL) tag ${IMG} ${DOCKERHUB_IMG}
+	$(CONTAINER_TOOL) push ${DOCKERHUB_IMG}
+
+.PHONY: docker-push-all
+docker-push-all: docker-push docker-push-dockerhub ## Push docker image to both GitHub Container Registry and Docker Hub.
+
 # PLATFORMS defines the target platforms for the manager image be built to provide support to multiple
 # architectures. (i.e. make docker-buildx IMG=myregistry/mypoperator:0.0.1). To use this option you need to:
 # - be able to use docker buildx. More info: https://docs.docker.com/build/buildx/
@@ -129,6 +142,26 @@ docker-buildx: ## Build and push docker image for the manager for cross-platform
 	$(CONTAINER_TOOL) buildx use cronjob-scale-down-operator-builder
 	- $(CONTAINER_TOOL) buildx build --push --platform=$(PLATFORMS) --tag ${IMG} -f Dockerfile.cross .
 	- $(CONTAINER_TOOL) buildx rm cronjob-scale-down-operator-builder
+	rm Dockerfile.cross
+
+.PHONY: docker-buildx-dockerhub
+docker-buildx-dockerhub: ## Build and push docker image to Docker Hub for cross-platform support
+	# copy existing Dockerfile and insert --platform=${BUILDPLATFORM} into Dockerfile.cross, and preserve the original Dockerfile
+	sed -e '1 s/\(^FROM\)/FROM --platform=\$$\{BUILDPLATFORM\}/; t' -e ' 1,// s//FROM --platform=\$$\{BUILDPLATFORM\}/' Dockerfile > Dockerfile.cross
+	- $(CONTAINER_TOOL) buildx create --name cronjob-scale-down-operator-builder-dockerhub
+	$(CONTAINER_TOOL) buildx use cronjob-scale-down-operator-builder-dockerhub
+	- $(CONTAINER_TOOL) buildx build --push --platform=$(PLATFORMS) --tag ${DOCKERHUB_IMG} -f Dockerfile.cross .
+	- $(CONTAINER_TOOL) buildx rm cronjob-scale-down-operator-builder-dockerhub
+	rm Dockerfile.cross
+
+.PHONY: docker-buildx-all
+docker-buildx-all: ## Build and push docker image to both registries for cross-platform support
+	# copy existing Dockerfile and insert --platform=${BUILDPLATFORM} into Dockerfile.cross, and preserve the original Dockerfile
+	sed -e '1 s/\(^FROM\)/FROM --platform=\$$\{BUILDPLATFORM\}/; t' -e ' 1,// s//FROM --platform=\$$\{BUILDPLATFORM\}/' Dockerfile > Dockerfile.cross
+	- $(CONTAINER_TOOL) buildx create --name cronjob-scale-down-operator-builder-all
+	$(CONTAINER_TOOL) buildx use cronjob-scale-down-operator-builder-all
+	- $(CONTAINER_TOOL) buildx build --push --platform=$(PLATFORMS) --tag ${IMG} --tag ${DOCKERHUB_IMG} -f Dockerfile.cross .
+	- $(CONTAINER_TOOL) buildx rm cronjob-scale-down-operator-builder-all
 	rm Dockerfile.cross
 
 .PHONY: build-installer

@@ -18,6 +18,10 @@ helm repo update
 # Install
 helm install cronjob-scale-down-operator cronschedules/cronjob-scale-down-operator
 
+# Or install with Docker Hub image
+helm install cronjob-scale-down-operator cronschedules/cronjob-scale-down-operator \
+  --set image.repository=cronschedules/cronjob-scale-down-operator
+
 # Verify
 kubectl get pods -l app.kubernetes.io/name=cronjob-scale-down-operator
 kubectl get crd cronjobscaledowns.cronschedules.elbazi.co
@@ -167,7 +171,7 @@ helm install cronjob-scale-down-operator cronschedules/cronjob-scale-down-operat
 
 | Parameter | Description | Default |
 |-----------|-------------|---------|
-| `image.repository` | Container image repository | `ghcr.io/z4ck404/cronjob-scale-down-operator` |
+| `image.repository` | Container image repository | `ghcr.io/cronschedules/cronjob-scale-down-operator` |
 | `image.tag` | Container image tag | `0.3.0` |
 | `image.pullPolicy` | Image pull policy | `IfNotPresent` |
 | `replicaCount` | Number of operator replicas | `1` |
