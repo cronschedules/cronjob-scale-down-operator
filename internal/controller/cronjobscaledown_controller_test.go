@@ -145,4 +145,137 @@ var _ = Describe("CronJobScaleDown Controller", func() {
 			Expect(err).NotTo(HaveOccurred())
 		})
 	})
+
+	Context("When testing orphan resource cleanup functionality", func() {
+		const orphanCleanupResourceName = "test-orphan-cleanup-resource"
+
+		ctx := context.Background()
+
+		typeNamespacedName := types.NamespacedName{
+			Name:      orphanCleanupResourceName,
+			Namespace: "default",
+		}
+		cronjobscaledown := &cronschedulesv1.CronJobScaleDown{}
+
+		BeforeEach(func() {
+			By("creating the custom resource for orphan cleanup testing")
+			err := k8sClient.Get(ctx, typeNamespacedName, cronjobscaledown)
+			if err != nil && errors.IsNotFound(err) {
+				resource := &cronschedulesv1.CronJobScaleDown{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      orphanCleanupResourceName,
+						Namespace: "default",
+					},
+					Spec: cronschedulesv1.CronJobScaleDownSpec{
+						CleanupSchedule: "*/30 * * * * *", // Every 30 seconds for testing
+						CleanupConfig: &cronschedulesv1.CleanupConfig{
+							AnnotationKey:          "test.elbazi.co/cleanup-after",
+							ResourceTypes:          []string{"ConfigMap", "Role"},
+							DryRun:                 true, // Use dry run for testing
+							CleanupOrphanResources: true,
+							OrphanResourceMaxAge:   "1h", // 1 hour for testing
+						},
+						TimeZone: "UTC",
+					},
+				}
+				Expect(k8sClient.Create(ctx, resource)).To(Succeed())
+			}
+		})
+
+		AfterEach(func() {
+			resource := &cronschedulesv1.CronJobScaleDown{}
+			err := k8sClient.Get(ctx, typeNamespacedName, resource)
+			Expect(err).NotTo(HaveOccurred())
+
+			By("Cleanup the specific resource instance CronJobScaleDown")
+			Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
+		})
+
+		It("should reconcile without error for orphan cleanup configuration", func() {
+			By("Reconciling the created resource")
+			controllerReconciler := &CronJobScaleDownReconciler{
+				Client: k8sClient,
+				Scheme: k8sClient.Scheme(),
+			}
+
+			_, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
+				NamespacedName: typeNamespacedName,
+			})
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		It("should validate orphan cleanup configuration correctly", func() {
+			By("Testing valid orphan cleanup configuration")
+			controllerReconciler := &CronJobScaleDownReconciler{
+				Client: k8sClient,
+				Scheme: k8sClient.Scheme(),
+			}
+
+			resource := &cronschedulesv1.CronJobScaleDown{
+				Spec: cronschedulesv1.CronJobScaleDownSpec{
+					CleanupSchedule: "0 0 * * * *",
+					CleanupConfig: &cronschedulesv1.CleanupConfig{
+						AnnotationKey:          "cleanup-after",
+						ResourceTypes:          []string{"ConfigMap"},
+						CleanupOrphanResources: true,
+						OrphanResourceMaxAge:   "24h",
+					},
+					TimeZone: "UTC",
+				},
+			}
+
+			err := controllerReconciler.validateCleanupConfig(resource.Spec.CleanupConfig)
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		It("should reject invalid orphan cleanup configuration", func() {
+			By("Testing invalid orphan cleanup configuration - missing max age")
+			controllerReconciler := &CronJobScaleDownReconciler{
+				Client: k8sClient,
+				Scheme: k8sClient.Scheme(),
+			}
+
+			resource := &cronschedulesv1.CronJobScaleDown{
+				Spec: cronschedulesv1.CronJobScaleDownSpec{
+					CleanupSchedule: "0 0 * * * *",
+					CleanupConfig: &cronschedulesv1.CleanupConfig{
+						AnnotationKey:          "cleanup-after",
+						ResourceTypes:          []string{"ConfigMap"},
+						CleanupOrphanResources: true,
+						// Missing OrphanResourceMaxAge
+					},
+					TimeZone: "UTC",
+				},
+			}
+
+			err := controllerReconciler.validateCleanupConfig(resource.Spec.CleanupConfig)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("orphanResourceMaxAge is required"))
+		})
+
+		It("should reject invalid duration format", func() {
+			By("Testing invalid duration format")
+			controllerReconciler := &CronJobScaleDownReconciler{
+				Client: k8sClient,
+				Scheme: k8sClient.Scheme(),
+			}
+
+			resource := &cronschedulesv1.CronJobScaleDown{
+				Spec: cronschedulesv1.CronJobScaleDownSpec{
+					CleanupSchedule: "0 0 * * * *",
+					CleanupConfig: &cronschedulesv1.CleanupConfig{
+						AnnotationKey:          "cleanup-after",
+						ResourceTypes:          []string{"ConfigMap"},
+						CleanupOrphanResources: true,
+						OrphanResourceMaxAge:   "invalid-duration",
+					},
+					TimeZone: "UTC",
+				},
+			}
+
+			err := controllerReconciler.validateCleanupConfig(resource.Spec.CleanupConfig)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("invalid orphanResourceMaxAge format"))
+		})
+	})
 })

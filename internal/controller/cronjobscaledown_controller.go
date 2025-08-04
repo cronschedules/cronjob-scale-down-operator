@@ -46,11 +46,15 @@ var (
 //+kubebuilder:rbac:groups=cronschedules.elbazi.co,resources=cronjobscaledowns,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=cronschedules.elbazi.co,resources=cronjobscaledowns/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=cronschedules.elbazi.co,resources=cronjobscaledowns/finalizers,verbs=update
-//+kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;update;patch
-//+kubebuilder:rbac:groups=apps,resources=statefulsets,verbs=get;list;watch;update;patch
+//+kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;update;patch;delete
+//+kubebuilder:rbac:groups=apps,resources=statefulsets,verbs=get;list;watch;update;patch;delete
 //+kubebuilder:rbac:groups="",resources=services,verbs=get;list;delete
 //+kubebuilder:rbac:groups="",resources=configmaps,verbs=get;list;delete
 //+kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;delete
+//+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=roles,verbs=get;list;delete
+//+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=rolebindings,verbs=get;list;delete
+//+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=clusterroles,verbs=get;list;delete
+//+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=clusterrolebindings,verbs=get;list;delete
 
 // CronJobScaleDownReconciler reconciles a CronJobScaleDown object
 type CronJobScaleDownReconciler struct {
@@ -230,16 +234,32 @@ func (r *CronJobScaleDownReconciler) validateCleanupConfig(cleanupConfig *cronsc
 
 	// Validate supported resource types
 	supportedTypes := map[string]bool{
-		"Deployment":  true,
-		"StatefulSet": true,
-		"Service":     true,
-		"ConfigMap":   true,
-		"Secret":      true,
+		"Deployment":         true,
+		"StatefulSet":        true,
+		"Service":            true,
+		"ConfigMap":          true,
+		"Secret":             true,
+		"Role":               true,
+		"RoleBinding":        true,
+		"ClusterRole":        true,
+		"ClusterRoleBinding": true,
 	}
 
 	for _, resourceType := range cleanupConfig.ResourceTypes {
 		if !supportedTypes[resourceType] {
 			return fmt.Errorf("unsupported resource type for cleanup: %s", resourceType)
+		}
+	}
+
+	// Validate orphan cleanup configuration
+	if cleanupConfig.CleanupOrphanResources {
+		if cleanupConfig.OrphanResourceMaxAge == "" {
+			return fmt.Errorf("orphanResourceMaxAge is required when cleanupOrphanResources is enabled")
+		}
+
+		// Validate the duration format
+		if _, err := time.ParseDuration(cleanupConfig.OrphanResourceMaxAge); err != nil {
+			return fmt.Errorf("invalid orphanResourceMaxAge format: %w", err)
 		}
 	}
 

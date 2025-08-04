@@ -1,7 +1,7 @@
 ---
 # Example CronJobScaleDown for cleanup-only functionality
 # This example shows how to use the operator just for cleaning up test resources
-# without any scaling functionality
+# without any scaling functionality, including new orphan resource cleanup
 apiVersion: cronschedules.elbazi.co/v1
 kind: CronJobScaleDown
 metadata:
@@ -14,15 +14,22 @@ spec:
     # Look for resources with this annotation
     annotationKey: "test.elbazi.co/cleanup-after"
     
-    # Clean up these resource types
+    # Clean up these resource types (now includes RBAC resources)
     resourceTypes:
       - "Deployment"
       - "Service"
       - "ConfigMap"
+      - "Role"
+      - "RoleBinding"
     
     # Optional: Additional filters
     labelSelector:
       app.kubernetes.io/created-by: "test"
+    
+    # NEW: Enable orphan resource cleanup
+    cleanupOrphanResources: true
+    # NEW: Clean up unannotated resources older than 3 days
+    orphanResourceMaxAge: "72h"  # 3 days
     
     # Enable dry-run to see what would be deleted
     dryRun: false
@@ -71,3 +78,39 @@ spec:
     app: temp-app
   ports:
   - port: 80
+
+---
+# Example RBAC Role that will be cleaned up based on annotation
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: temporary-test-role
+  namespace: default
+  labels:
+    app.kubernetes.io/created-by: "test"
+  annotations:
+    # Delete this role 12 hours after creation
+    test.elbazi.co/cleanup-after: "12h"
+rules:
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get", "list"]
+
+---
+# Example orphan RoleBinding that will be cleaned up (no annotation, but older than 3 days)
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: orphan-test-rolebinding
+  namespace: default
+  labels:
+    app.kubernetes.io/created-by: "test"
+  # NO cleanup annotation - this is an orphan resource that will be cleaned up if older than 72h
+subjects:
+- kind: User
+  name: test-user
+  apiGroup: rbac.authorization.k8s.io
+roleRef:
+  kind: Role
+  name: temporary-test-role
+  apiGroup: rbac.authorization.k8s.io

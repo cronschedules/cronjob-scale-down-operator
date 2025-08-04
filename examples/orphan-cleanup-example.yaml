@@ -1,0 +1,153 @@
+---
+# Example CronJobScaleDown with orphan resource cleanup functionality
+# This example demonstrates how to clean up unannotated/forgotten resources
+# in addition to the standard annotation-based cleanup
+apiVersion: cronschedules.elbazi.co/v1
+kind: CronJobScaleDown
+metadata:
+  name: orphan-resource-cleanup
+  namespace: default
+spec:
+  # Optional: Still supports scaling if needed
+  targetRef:
+    name: nginx-test
+    namespace: default
+    kind: Deployment
+    apiVersion: apps/v1
+  scaleDownSchedule: "0 0 22 * * *"  # Scale down at 10 PM
+  scaleUpSchedule: "0 0 6 * * *"     # Scale up at 6 AM
+  
+  # Cleanup configuration with orphan resource support
+  cleanupSchedule: "0 0 3 * * *"     # Run cleanup at 3 AM daily
+  cleanupConfig:
+    # Annotation that marks resources for cleanup (standard behavior)
+    annotationKey: "cleanup-after"
+    
+    # Resource types to check for cleanup (now includes RBAC resources)
+    resourceTypes:
+      - "Deployment"
+      - "Service"
+      - "ConfigMap"
+      - "Secret"
+      - "Role"
+      - "RoleBinding"
+      # Note: ClusterRole and ClusterRoleBinding are cluster-scoped
+      # - "ClusterRole"
+      # - "ClusterRoleBinding"
+    
+    # Optional: Only cleanup resources in these namespaces
+    namespaces:
+      - "default"
+      - "test"
+      - "staging"
+    
+    # Optional: Additional label selector to filter resources
+    labelSelector:
+      app.kubernetes.io/managed-by: "test"
+    
+    # NEW: Enable orphan resource cleanup
+    cleanupOrphanResources: true
+    # NEW: Clean up unannotated resources older than 7 days
+    orphanResourceMaxAge: "168h"  # 7 days
+    
+    # Optional: Enable dry-run mode to see what would be deleted
+    dryRun: false
+  
+  timeZone: "UTC"
+
+---
+# Example annotated resource that will be cleaned up based on annotation
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: annotated-test-deployment
+  namespace: default
+  labels:
+    app.kubernetes.io/managed-by: "test"
+  annotations:
+    # This deployment will be deleted 24 hours after creation
+    cleanup-after: "24h"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: annotated-app
+  template:
+    metadata:
+      labels:
+        app: annotated-app
+    spec:
+      containers:
+      - name: nginx
+        image: nginx:latest
+
+---
+# Example orphan resource that will be cleaned up if older than 7 days
+# This resource has NO cleanup annotation, but will be cleaned up as an orphan
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: orphan-test-deployment
+  namespace: default
+  labels:
+    app.kubernetes.io/managed-by: "test"
+  # NO cleanup-after annotation - this is an "orphan" resource
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: orphan-app
+  template:
+    metadata:
+      labels:
+        app: orphan-app
+    spec:
+      containers:
+      - name: nginx
+        image: nginx:latest
+
+---
+# Example RBAC resources that can now be cleaned up
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: test-role
+  namespace: default
+  labels:
+    app.kubernetes.io/managed-by: "test"
+  annotations:
+    cleanup-after: "48h"  # Delete after 48 hours
+rules:
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get", "list"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: orphan-rolebinding
+  namespace: default
+  labels:
+    app.kubernetes.io/managed-by: "test"
+  # NO cleanup annotation - will be cleaned up as orphan if older than 7 days
+subjects:
+- kind: User
+  name: test-user
+  apiGroup: rbac.authorization.k8s.io
+roleRef:
+  kind: Role
+  name: test-role
+  apiGroup: rbac.authorization.k8s.io
+
+---
+# Example ConfigMap that would NOT be cleaned up (different label)
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: important-config
+  namespace: default
+  labels:
+    app.kubernetes.io/managed-by: "production"  # Different label - won't match selector
+data:
+  config: "important data"

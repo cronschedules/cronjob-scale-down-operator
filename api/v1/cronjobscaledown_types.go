@@ -87,6 +87,17 @@ type CleanupConfig struct {
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default:=false
 	DryRun bool `json:"dryRun,omitempty"`
+
+	// CleanupOrphanResources enables cleanup of resources without the cleanup annotation
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default:=false
+	CleanupOrphanResources bool `json:"cleanupOrphanResources,omitempty"`
+
+	// OrphanResourceMaxAge defines the maximum age for orphan resources before cleanup
+	// Resources older than this duration without cleanup annotation will be deleted
+	// Format: duration string (e.g., "24h", "7d", "168h")
+	// +kubebuilder:validation:Optional
+	OrphanResourceMaxAge string `json:"orphanResourceMaxAge,omitempty"`
 }
 
 // CronJobScaleDownStatus defines the observed state of CronJobScaleDown.

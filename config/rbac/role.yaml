@@ -20,6 +20,7 @@ rules:
   - deployments
   - statefulsets
   verbs:
+  - delete
   - get
   - list
   - patch
@@ -51,3 +52,14 @@ rules:
   - get
   - patch
   - update
+- apiGroups:
+  - rbac.authorization.k8s.io
+  resources:
+  - clusterrolebindings
+  - clusterroles
+  - rolebindings
+  - roles
+  verbs:
+  - delete
+  - get
+  - list
