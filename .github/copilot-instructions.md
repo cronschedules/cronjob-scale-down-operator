@@ -62,6 +62,18 @@ The CronJob Scale Down Operator provides:
 5. **Logging**: Use logr structured logging throughout
 6. **Testing**: Write table-driven tests, use envtest for controller testing
 
+### Code Quality Standards
+1. **Readable Code**: Write self-documenting code with clear variable and function names
+2. **Clean Architecture**: Follow SOLID principles and maintain clear separation of concerns
+3. **Maintainable Functions**: Keep functions small, focused, and doing one thing well
+4. **Meaningful Comments**: Document complex business logic, not obvious code
+5. **Consistent Naming**: Use Go naming conventions (camelCase, PascalCase appropriately)
+6. **DRY Principle**: Avoid code duplication, extract common functionality into utilities
+7. **Error Context**: Provide meaningful error messages with sufficient context
+8. **Type Safety**: Leverage Go's type system for compile-time safety
+9. **Interface Design**: Define small, focused interfaces following Go idioms
+10. **Resource Management**: Properly handle resource cleanup and context cancellation
+
 ### Kubernetes Operator Patterns
 1. **Reconciliation**: Implement idempotent reconcile loops
 2. **Status Updates**: Always update resource status with current state
@@ -80,6 +92,16 @@ The CronJob Scale Down Operator provides:
 2. **Code Comments**: Document public APIs and complex logic
 3. **Examples**: Provide working examples in `examples/` directory
 4. **Helm Charts**: Charts are maintained in separate repository `cronschedules/charts`
+
+### Code Organization Principles
+1. **Package Structure**: Organize code into logical packages with clear boundaries
+2. **Single Responsibility**: Each package, struct, and function should have one clear purpose
+3. **Dependency Direction**: Dependencies should flow inward (business logic doesn't depend on infrastructure)
+4. **Abstraction Layers**: Use interfaces to decouple components and enable testing
+5. **Configuration Management**: Centralize configuration and avoid hardcoded values
+6. **Error Handling Strategy**: Implement consistent error handling patterns throughout the codebase
+7. **Logging Strategy**: Use structured logging with appropriate log levels and context
+8. **Testing Structure**: Mirror source code structure in test packages for clarity
 
 ## Testing Guidelines
 
