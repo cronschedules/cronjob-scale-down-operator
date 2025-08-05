@@ -7,6 +7,7 @@ import (
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -330,6 +331,10 @@ func (c *K8sClient) createResourceList(resourceType string) (client.ObjectList, 
 		return &corev1.ConfigMapList{}, nil
 	case "Secret":
 		return &corev1.SecretList{}, nil
+	case "Pod":
+		return &corev1.PodList{}, nil
+	case "Job":
+		return &batchv1.JobList{}, nil
 	case "Role":
 		return &rbacv1.RoleList{}, nil
 	case "RoleBinding":
@@ -392,6 +397,18 @@ func (c *K8sClient) processResourceList(ctx context.Context, objList client.Obje
 			}
 		}
 	case *corev1.SecretList:
+		for _, item := range list.Items {
+			if c.shouldCleanupResource(ctx, &item, cleanupConfig) {
+				deleted += c.deleteResource(ctx, &item, cleanupConfig.DryRun)
+			}
+		}
+	case *corev1.PodList:
+		for _, item := range list.Items {
+			if c.shouldCleanupResource(ctx, &item, cleanupConfig) {
+				deleted += c.deleteResource(ctx, &item, cleanupConfig.DryRun)
+			}
+		}
+	case *batchv1.JobList:
 		for _, item := range list.Items {
 			if c.shouldCleanupResource(ctx, &item, cleanupConfig) {
 				deleted += c.deleteResource(ctx, &item, cleanupConfig.DryRun)

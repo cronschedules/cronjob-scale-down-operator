@@ -23,12 +23,14 @@ spec:
     # Annotation that marks resources for cleanup (standard behavior)
     annotationKey: "cleanup-after"
     
-    # Resource types to check for cleanup (now includes RBAC resources)
+    # Resource types to check for cleanup (now includes RBAC and failed resources)
     resourceTypes:
       - "Deployment"
       - "Service"
       - "ConfigMap"
       - "Secret"
+      - "Pod"          # Useful for cleaning up evicted or failed pods
+      - "Job"          # Useful for cleaning up failed jobs
       - "Role"
       - "RoleBinding"
       # Note: ClusterRole and ClusterRoleBinding are cluster-scoped
@@ -151,3 +153,43 @@ metadata:
     app.kubernetes.io/managed-by: "production"  # Different label - won't match selector
 data:
   config: "important data"
+
+---
+# Example failed Job that could be cleaned up
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: test-job
+  namespace: default
+  labels:
+    app.kubernetes.io/managed-by: "test"
+  annotations:
+    cleanup-after: "12h"  # Clean up after 12 hours
+spec:
+  template:
+    spec:
+      containers:
+      - name: test-container
+        image: busybox
+        command: ["echo", "test job"]
+      restartPolicy: Never
+
+---
+# Example orphan Job (no cleanup annotation)
+# Useful for cleaning up failed test jobs automatically
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: orphan-test-job
+  namespace: default
+  labels:
+    app.kubernetes.io/managed-by: "test"
+  # NO cleanup annotation - will be cleaned up as orphan if older than 7 days
+spec:
+  template:
+    spec:
+      containers:
+      - name: orphan-container
+        image: busybox
+        command: ["echo", "orphan job"]
+      restartPolicy: Never

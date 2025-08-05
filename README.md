@@ -275,13 +275,15 @@ spec:
     # Annotation key that marks resources for cleanup
     annotationKey: "cleanup-after"
     
-    # Resource types to cleanup (now includes RBAC resources)
+    # Resource types to cleanup (now includes RBAC and failed resources)
     resourceTypes:
       - "Deployment"
       - "Service" 
       - "ConfigMap"
       - "Secret"
       - "StatefulSet"
+      - "Pod"          # Useful for cleaning up evicted or failed pods
+      - "Job"          # Useful for cleaning up failed jobs
       - "Role"
       - "RoleBinding"
       # Note: ClusterRole and ClusterRoleBinding are also supported (cluster-scoped)
@@ -358,6 +360,7 @@ This configuration will:
 
 **Supported Resource Types:**
 - Standard resources: `Deployment`, `StatefulSet`, `Service`, `ConfigMap`, `Secret`
+- Workload resources: `Pod`, `Job` (useful for cleaning up failed/evicted resources)
 - RBAC resources: `Role`, `RoleBinding`, `ClusterRole`, `ClusterRoleBinding`
 
 **Safety considerations:**
