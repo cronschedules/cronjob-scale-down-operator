@@ -35,7 +35,7 @@ Create `values.yaml`:
 
 ```yaml
 image:
-  tag: "0.3.0"
+  tag: "0.4.0"  # Latest version with orphan cleanup
 replicaCount: 2
 resources:
   requests:
@@ -53,7 +53,7 @@ helm install cronjob-scale-down-operator cronschedules/cronjob-scale-down-operat
 
 ```bash
 helm install cronjob-scale-down-operator cronschedules/cronjob-scale-down-operator \
-  --set image.tag=0.3.0 \
+  --set image.tag=0.4.0 \
   --set replicaCount=2 \
   --set resources.requests.memory=128Mi
 ```
@@ -125,7 +125,7 @@ helm template cronjob-scale-down-operator ./charts/cronjob-scale-down-operator
 ```yaml
 # Custom values for cronjob-scale-down-operator
 image:
-  tag: "0.3.0"
+  tag: "0.4.0"
 
 resources:
   limits:
@@ -162,7 +162,7 @@ helm install cronjob-scale-down-operator cronschedules/cronjob-scale-down-operat
 
 ```bash
 helm install cronjob-scale-down-operator cronschedules/cronjob-scale-down-operator \
-  --set image.tag=0.3.0 \
+  --set image.tag=0.4.0 \
   --set replicaCount=2 \
   --set resources.requests.memory=128Mi
 ```
@@ -172,7 +172,7 @@ helm install cronjob-scale-down-operator cronschedules/cronjob-scale-down-operat
 | Parameter | Description | Default |
 |-----------|-------------|---------|
 | `image.repository` | Container image repository | `ghcr.io/cronschedules/cronjob-scale-down-operator` |
-| `image.tag` | Container image tag | `0.3.0` |
+| `image.tag` | Container image tag | `0.4.0` |
 | `image.pullPolicy` | Image pull policy | `IfNotPresent` |
 | `replicaCount` | Number of operator replicas | `1` |
 | `serviceAccount.create` | Create service account | `true` |

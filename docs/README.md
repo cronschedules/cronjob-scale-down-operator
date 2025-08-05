@@ -4,15 +4,16 @@ Kubernetes operator for scheduled scaling of Deployments and StatefulSets.
 
 ## Features
 
-- Cron-based scheduling with second precision
-- Timezone support
-- Scale down/up on different schedules
-- Supports Deployments and StatefulSets
-- Resource cleanup based on annotations
-- Cleanup-only mode (no scaling target)
-- Status tracking
-- Web UI dashboard
-- Dry-run mode for testing
+- **Scaling**: Cron-based scheduling with second precision
+- **Timezone Support**: Multi-timezone scheduling
+- **Resource Types**: Deployments and StatefulSets
+- **Resource Cleanup**: Annotation-based cleanup with configurable schedules
+- **Orphan Cleanup**: Age-based cleanup for resources without annotations (v0.4.0+)
+- **RBAC Support**: Extended cleanup for Roles, RoleBindings, and cluster resources (v0.4.0+)
+- **Flexible Modes**: Scaling + cleanup, or cleanup-only operation
+- **Safety Features**: Dry-run mode, label selectors, age thresholds
+- **Monitoring**: Status tracking and Web UI dashboard
+- **Enterprise Ready**: Multi-architecture container images
 
 ## Installation
 
@@ -168,10 +169,10 @@ The operator is available as a pre-built container image from multiple registrie
 
 ```bash
 # From Docker Hub:
-docker pull cronschedules/cronjob-scale-down-operator:0.3.0
+docker pull cronschedules/cronjob-scale-down-operator:0.4.0
 
 # From GitHub Container Registry:
-docker pull ghcr.io/cronschedules/cronjob-scale-down-operator:0.3.0
+docker pull ghcr.io/cronschedules/cronjob-scale-down-operator:0.4.0
 ```
 
 Use these images in your custom deployments or with the provided Helm chart.
@@ -219,14 +220,23 @@ The [`examples/`](../examples/) directory contains various use cases:
 
 ## Cleanup-Only Mode
 
-The operator supports a cleanup-only mode where it manages resource cleanup without scaling any target resources. This is perfect for environments where you need automated cleanup of test resources, temporary objects, or expired configurations.
+The operator supports comprehensive resource cleanup capabilities including both annotation-based cleanup and orphan resource cleanup (v0.4.0+). Perfect for automated management of test resources, CI/CD artifacts, and temporary objects.
+
+### Cleanup Capabilities
+
+- **Annotation-Based**: Clean resources with specific cleanup timestamps
+- **Orphan Cleanup**: Clean resources without annotations based on age thresholds (v0.4.0+)
+- **RBAC Support**: Clean Roles, RoleBindings, and cluster resources (v0.4.0+)
+- **Label Filtering**: Target specific resources using label selectors
+- **Multi-Resource**: Support for Pods, Jobs, ConfigMaps, Secrets, and more
 
 ### When to Use Cleanup-Only Mode
 
-- **CI/CD Pipelines**: Automatically clean up test resources after builds
-- **Development Environments**: Remove temporary test objects on a schedule
-- **Resource Management**: Clean up expired ConfigMaps, Secrets, or test deployments
+- **CI/CD Pipelines**: Automatically clean up test resources and failed jobs
+- **Development Environments**: Remove forgotten development resources
+- **Resource Management**: Clean up expired ConfigMaps, Secrets, or test deployments  
 - **Cost Optimization**: Remove unused resources to save cluster costs
+- **Orphan Management**: Clean up resources without cleanup annotations
 
 ### Cleanup-Only Configuration
 
@@ -354,8 +364,8 @@ The operator can be installed using Helm for easier management and configuration
 ### Chart Information
 
 - **Repository**: `ghcr.io/cronschedules/cronjob-scale-down-operator` or `cronschedules/cronjob-scale-down-operator` (Docker Hub)
-- **Image Tag**: `0.3.0`
-- **Chart Version**: `0.3.0`
+- **Image Tag**: `0.4.0`
+- **Chart Version**: `0.4.0`
 
 ### Installation Steps
 
@@ -369,7 +379,7 @@ The operator can be installed using Helm for easier management and configuration
 2. **Custom values:**
    ```bash
    helm install cronjob-scale-down-operator cronschedules/cronjob-scale-down-operator \
-     --set image.tag=0.3.0 \
+     --set image.tag=0.4.0 \
      --set resources.requests.memory=128Mi \
      --set replicaCount=1
    ```
@@ -391,7 +401,7 @@ Key Helm chart values:
 | Parameter | Description | Default |
 |-----------|-------------|---------|
 | `image.repository` | Container image repository | `ghcr.io/cronschedules/cronjob-scale-down-operator` |
-| `image.tag` | Container image tag | `0.3.0` |
+| `image.tag` | Container image tag | `0.4.0` |
 | `replicaCount` | Number of operator replicas | `1` |
 | `resources.limits.memory` | Memory limit | `128Mi` |
 | `resources.requests.cpu` | CPU request | `10m` |

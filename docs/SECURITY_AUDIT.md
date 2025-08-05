@@ -77,6 +77,7 @@ A comprehensive security audit was conducted on the CronJob-Scale-Down-Operator 
 - ✅ Namespace-scoped alternative
 - ✅ Least privilege principle
 - ✅ Service account isolation
+- ✅ Extended RBAC for resource cleanup (v0.4.0+)
 
 ### Documentation
 - ✅ Comprehensive SECURITY.md

@@ -1,10 +1,16 @@
 # Resource Cleanup
 
-Automatically clean up Kubernetes resources based on annotations and schedules.
+Automatically clean up Kubernetes resources based on annotations, schedules, and age thresholds.
 
 ## Overview
 
-Two modes:
+The CronJob Scale Down Operator provides comprehensive resource cleanup capabilities with two main approaches:
+
+- **Annotation-Based Cleanup**: Resources with specific cleanup annotations
+- **Orphan Resource Cleanup**: Resources without annotations based on age thresholds (v0.4.0+)
+
+### Deployment Modes
+
 - **Cleanup-Only**: Pure cleanup without scaling
 - **Combined**: Cleanup + scaling operations
 
@@ -35,24 +41,42 @@ spec:
       - "Secret"
       - "Service"
       - "Deployment"
+    
+    # NEW in v0.4.0: Orphan resource cleanup
+    cleanupOrphanResources: true
+    orphanResourceMaxAge: "168h"  # 7 days
+    
+    # Optional: Target specific resources
+    labelSelector:
+      app.kubernetes.io/managed-by: "test"
+      
     dryRun: false
   timeZone: "UTC"
 ```
 
 ## Resource Types
 
-Supported resource types for cleanup:
+Supported resource types for cleanup (expanded in v0.4.0):
 
 ```yaml
 cleanupConfig:
   resourceTypes:
+    # Standard Resources
     - "ConfigMap"
     - "Secret"
     - "Service"
     - "Deployment"
     - "StatefulSet"
+    
+    # Workload Resources (v0.4.0+)
     - "Job"
     - "Pod"
+    
+    # RBAC Resources (v0.4.0+)
+    - "Role"
+    - "RoleBinding"
+    - "ClusterRole"
+    - "ClusterRoleBinding"
 ```
 
 ## Annotation-Based Cleanup
@@ -77,6 +101,69 @@ metadata:
     test.example.com/cleanup-after: "2025-01-20T15:30:00Z"
 data:
   test: "data"
+```
+
+## Orphan Resource Cleanup (v0.4.0+)
+
+Clean up resources **without** cleanup annotations based on age thresholds. Perfect for cleaning up forgotten test resources and CI/CD artifacts.
+
+### Configuration
+
+```yaml
+cleanupConfig:
+  # Enable orphan cleanup (disabled by default)
+  cleanupOrphanResources: true
+  
+  # Age threshold - resources older than this will be cleaned
+  orphanResourceMaxAge: "72h"  # 3 days
+  
+  # Optional: Only clean resources matching these labels
+  labelSelector:
+    app.kubernetes.io/created-by: "test"
+    environment: "development"
+```
+
+### How It Works
+
+1. **Standard Cleanup**: Resources WITH annotations are cleaned based on their timestamp
+2. **Orphan Cleanup**: Resources WITHOUT annotations but matching criteria are cleaned based on age
+3. **Safety First**: Resources must be older than `orphanResourceMaxAge` threshold
+4. **Label Filtering**: Only resources matching `labelSelector` are considered for orphan cleanup
+
+### Use Cases
+
+- **CI/CD Cleanup**: Remove test artifacts older than a specific age
+- **Development Environment**: Clean up forgotten development resources  
+- **Failed Job Cleanup**: Remove failed pods and jobs automatically
+- **RBAC Cleanup**: Clean up temporary roles and bindings
+
+### Example: Comprehensive Cleanup
+
+```yaml
+apiVersion: cronschedules.elbazi.co/v1
+kind: CronJobScaleDown
+metadata:
+  name: comprehensive-cleanup
+spec:
+  cleanupSchedule: "0 0 3 * * *"  # Daily at 3 AM
+  cleanupConfig:
+    annotationKey: "cleanup-after"
+    resourceTypes:
+      - "Pod"
+      - "Job" 
+      - "ConfigMap"
+      - "Role"
+      - "RoleBinding"
+    
+    # Orphan cleanup configuration
+    cleanupOrphanResources: true
+    orphanResourceMaxAge: "168h"  # 7 days
+    
+    labelSelector:
+      app.kubernetes.io/managed-by: "test"
+    
+    dryRun: false
+  timeZone: "UTC"
 ```
 
 ## Combined Mode
@@ -125,7 +212,15 @@ spec:
   cleanupSchedule: "0 */30 * * * *"  # Every 30 minutes
   cleanupConfig:
     annotationKey: "ci.example.com/cleanup-after"
-    resourceTypes: ["Pod", "ConfigMap", "Secret"]
+    resourceTypes: ["Pod", "ConfigMap", "Secret", "Job"]
+    
+    # Clean orphan CI resources older than 2 hours
+    cleanupOrphanResources: true
+    orphanResourceMaxAge: "2h"
+    
+    labelSelector:
+      ci-pipeline: "true"
+    
     dryRun: false
 ```
 
@@ -141,6 +236,33 @@ spec:
   cleanupConfig:
     annotationKey: "dev.example.com/cleanup-after"
     resourceTypes: ["Deployment", "Service", "ConfigMap"]
+    
+    # Clean forgotten dev resources older than 3 days
+    cleanupOrphanResources: true
+    orphanResourceMaxAge: "72h"
+    
+    labelSelector:
+      environment: "development"
+```
+
+### Failed Workload Cleanup
+
+```yaml
+apiVersion: cronschedules.elbazi.co/v1
+kind: CronJobScaleDown
+metadata:
+  name: failed-workload-cleanup
+spec:
+  cleanupSchedule: "0 0 */4 * * *"  # Every 4 hours
+  cleanupConfig:
+    resourceTypes: ["Pod", "Job"]
+    
+    # Only orphan cleanup for failed workloads
+    cleanupOrphanResources: true
+    orphanResourceMaxAge: "1h"
+    
+    labelSelector:
+      job-type: "batch"
 ```
 
 ## Status
