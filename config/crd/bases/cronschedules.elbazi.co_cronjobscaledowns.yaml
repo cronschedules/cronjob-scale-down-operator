@@ -46,6 +46,11 @@ spec:
                   annotationKey:
                     description: Annotation key that marks resources for cleanup
                     type: string
+                  cleanupOrphanResources:
+                    default: false
+                    description: CleanupOrphanResources enables cleanup of resources
+                      without the cleanup annotation
+                    type: boolean
                   dryRun:
                     default: false
                     description: DryRun mode - if true, only logs what would be deleted
@@ -62,6 +67,12 @@ spec:
                     items:
                       type: string
                     type: array
+                  orphanResourceMaxAge:
+                    description: |-
+                      OrphanResourceMaxAge defines the maximum age for orphan resources before cleanup
+                      Resources older than this duration without cleanup annotation will be deleted
+                      Format: duration string (e.g., "24h", "7d", "168h")
+                    type: string
                   resourceTypes:
                     description: Resource types to cleanup (e.g., ["Deployment", "StatefulSet",
                       "Service", "ConfigMap"])

@@ -152,6 +152,7 @@ The [`examples/`](./examples/) directory contains various use cases:
 | **[statefulset-example.yaml](./examples/statefulset-example.yaml)** | Database scaling | StatefulSet support |
 | **[resource-cleanup-example.yaml](./examples/resource-cleanup-example.yaml)** | **Resource cleanup** | **Combined scaling + cleanup** |
 | **[cleanup-only-example.yaml](./examples/cleanup-only-example.yaml)** | **Cleanup only** | **Every 6 hours** |
+| **[orphan-cleanup-example.yaml](./examples/orphan-cleanup-example.yaml)** | **Orphan resource cleanup** | **Every 3 AM daily** |
 
 ## Cleanup-Only Mode
 
@@ -274,13 +275,18 @@ spec:
     # Annotation key that marks resources for cleanup
     annotationKey: "cleanup-after"
     
-    # Resource types to cleanup
+    # Resource types to cleanup (now includes RBAC and failed resources)
     resourceTypes:
       - "Deployment"
       - "Service" 
       - "ConfigMap"
       - "Secret"
       - "StatefulSet"
+      - "Pod"          # Useful for cleaning up evicted or failed pods
+      - "Job"          # Useful for cleaning up failed jobs
+      - "Role"
+      - "RoleBinding"
+      # Note: ClusterRole and ClusterRoleBinding are also supported (cluster-scoped)
     
     # Optional: Limit cleanup to specific namespaces
     namespaces:
@@ -290,6 +296,11 @@ spec:
     # Optional: Additional label selector
     labelSelector:
       environment: "test"
+    
+    # NEW: Enable orphan resource cleanup (resources without cleanup annotation)
+    cleanupOrphanResources: true
+    # NEW: Maximum age for orphan resources before cleanup
+    orphanResourceMaxAge: "168h"  # 7 days
     
     # Optional: Enable dry-run mode (default: false)
     dryRun: false
@@ -321,6 +332,42 @@ metadata:
 spec:
   # ... deployment spec
 ```
+
+#### Orphan Resource Cleanup
+
+The operator now supports cleaning up "orphan" resources - resources that don't have the cleanup annotation but are old and potentially forgotten. This is useful for environments where resources are created during testing but not properly annotated for cleanup.
+
+**How it works:**
+- Enable `cleanupOrphanResources: true` in the cleanup configuration
+- Set `orphanResourceMaxAge` to define how old resources must be before cleanup
+- Only resources matching the label selector (if specified) will be considered
+- Resources without the cleanup annotation that are older than the max age will be deleted
+
+**Example scenario:**
+```yaml
+cleanupConfig:
+  annotationKey: "cleanup-after"
+  resourceTypes: ["ConfigMap", "Role", "RoleBinding"]
+  cleanupOrphanResources: true
+  orphanResourceMaxAge: "168h"  # 7 days
+  labelSelector:
+    app.kubernetes.io/managed-by: "test"
+```
+
+This configuration will:
+1. Clean up resources WITH the `cleanup-after` annotation according to their specified cleanup time
+2. Clean up resources WITHOUT the annotation that are labeled with `app.kubernetes.io/managed-by: test` and are older than 7 days
+
+**Supported Resource Types:**
+- Standard resources: `Deployment`, `StatefulSet`, `Service`, `ConfigMap`, `Secret`
+- Workload resources: `Pod`, `Job` (useful for cleaning up failed/evicted resources)
+- RBAC resources: `Role`, `RoleBinding`, `ClusterRole`, `ClusterRoleBinding`
+
+**Safety considerations:**
+- Orphan cleanup is opt-in (disabled by default)
+- Always test with `dryRun: true` first
+- Use label selectors to limit scope
+- Set appropriate max age to avoid deleting important resources
 
 ### Schedule Format
 

@@ -7,7 +7,9 @@ import (
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -301,27 +303,58 @@ func (c *K8sClient) CleanupResources(ctx context.Context, cleanupConfig *cronsch
 
 // cleanupResourceType handles cleanup for a specific resource type in a namespace
 func (c *K8sClient) cleanupResourceType(ctx context.Context, resourceType, namespace string, cleanupConfig *cronschedulesv1.CleanupConfig) (int32, error) {
-	var objList client.ObjectList
-
-	// Map resource types to their corresponding types
-	switch resourceType {
-	case "Deployment":
-		objList = &appsv1.DeploymentList{}
-	case "StatefulSet":
-		objList = &appsv1.StatefulSetList{}
-	case "Service":
-		objList = &corev1.ServiceList{}
-	case "ConfigMap":
-		objList = &corev1.ConfigMapList{}
-	case "Secret":
-		objList = &corev1.SecretList{}
-	default:
-		return 0, fmt.Errorf("unsupported resource type: %s", resourceType)
+	objList, err := c.createResourceList(resourceType)
+	if err != nil {
+		return 0, err
 	}
 
-	// Prepare list options
-	listOpts := []client.ListOption{
-		client.InNamespace(namespace),
+	listOpts := c.buildListOptions(resourceType, namespace, cleanupConfig)
+
+	// List resources
+	if err := c.List(ctx, objList, listOpts...); err != nil {
+		return 0, fmt.Errorf("failed to list %s in namespace %s: %w", resourceType, namespace, err)
+	}
+
+	return c.processResourceList(ctx, objList, cleanupConfig), nil
+}
+
+// createResourceList creates the appropriate list object for the resource type
+func (c *K8sClient) createResourceList(resourceType string) (client.ObjectList, error) {
+	switch resourceType {
+	case "Deployment":
+		return &appsv1.DeploymentList{}, nil
+	case "StatefulSet":
+		return &appsv1.StatefulSetList{}, nil
+	case "Service":
+		return &corev1.ServiceList{}, nil
+	case "ConfigMap":
+		return &corev1.ConfigMapList{}, nil
+	case "Secret":
+		return &corev1.SecretList{}, nil
+	case "Pod":
+		return &corev1.PodList{}, nil
+	case "Job":
+		return &batchv1.JobList{}, nil
+	case "Role":
+		return &rbacv1.RoleList{}, nil
+	case "RoleBinding":
+		return &rbacv1.RoleBindingList{}, nil
+	case "ClusterRole":
+		return &rbacv1.ClusterRoleList{}, nil
+	case "ClusterRoleBinding":
+		return &rbacv1.ClusterRoleBindingList{}, nil
+	default:
+		return nil, fmt.Errorf("unsupported resource type: %s", resourceType)
+	}
+}
+
+// buildListOptions builds the list options for querying resources
+func (c *K8sClient) buildListOptions(resourceType, namespace string, cleanupConfig *cronschedulesv1.CleanupConfig) []client.ListOption {
+	listOpts := []client.ListOption{}
+
+	// Namespace scoping: ClusterRole and ClusterRoleBinding are cluster-scoped
+	if resourceType != "ClusterRole" && resourceType != "ClusterRoleBinding" {
+		listOpts = append(listOpts, client.InNamespace(namespace))
 	}
 
 	// Add label selector if specified
@@ -330,48 +363,76 @@ func (c *K8sClient) cleanupResourceType(ctx context.Context, resourceType, names
 		listOpts = append(listOpts, client.MatchingLabelsSelector{Selector: selector})
 	}
 
-	// List resources
-	if err := c.List(ctx, objList, listOpts...); err != nil {
-		return 0, fmt.Errorf("failed to list %s in namespace %s: %w", resourceType, namespace, err)
-	}
+	return listOpts
+}
 
+// processResourceList processes a list of resources and returns the count of deleted resources
+func (c *K8sClient) processResourceList(ctx context.Context, objList client.ObjectList, cleanupConfig *cronschedulesv1.CleanupConfig) int32 {
 	var deleted int32
 
-	// Process each resource based on type
-	switch list := objList.(type) {
-	case *appsv1.DeploymentList:
-		for _, item := range list.Items {
-			if c.shouldCleanupResource(ctx, &item, cleanupConfig) {
-				deleted += c.deleteResource(ctx, &item, cleanupConfig.DryRun)
-			}
-		}
-	case *appsv1.StatefulSetList:
-		for _, item := range list.Items {
-			if c.shouldCleanupResource(ctx, &item, cleanupConfig) {
-				deleted += c.deleteResource(ctx, &item, cleanupConfig.DryRun)
-			}
-		}
-	case *corev1.ServiceList:
-		for _, item := range list.Items {
-			if c.shouldCleanupResource(ctx, &item, cleanupConfig) {
-				deleted += c.deleteResource(ctx, &item, cleanupConfig.DryRun)
-			}
-		}
-	case *corev1.ConfigMapList:
-		for _, item := range list.Items {
-			if c.shouldCleanupResource(ctx, &item, cleanupConfig) {
-				deleted += c.deleteResource(ctx, &item, cleanupConfig.DryRun)
-			}
-		}
-	case *corev1.SecretList:
-		for _, item := range list.Items {
-			if c.shouldCleanupResource(ctx, &item, cleanupConfig) {
-				deleted += c.deleteResource(ctx, &item, cleanupConfig.DryRun)
-			}
+	// Process each resource based on type using reflection to avoid repetitive code
+	items := c.extractItemsFromList(objList)
+	for _, item := range items {
+		if c.shouldCleanupResource(ctx, item, cleanupConfig) {
+			deleted += c.deleteResource(ctx, item, cleanupConfig.DryRun)
 		}
 	}
 
-	return deleted, nil
+	return deleted
+}
+
+// extractItemsFromList extracts items from different list types
+func (c *K8sClient) extractItemsFromList(objList client.ObjectList) []client.Object {
+	var items []client.Object
+
+	switch list := objList.(type) {
+	case *appsv1.DeploymentList:
+		for i := range list.Items {
+			items = append(items, &list.Items[i])
+		}
+	case *appsv1.StatefulSetList:
+		for i := range list.Items {
+			items = append(items, &list.Items[i])
+		}
+	case *corev1.ServiceList:
+		for i := range list.Items {
+			items = append(items, &list.Items[i])
+		}
+	case *corev1.ConfigMapList:
+		for i := range list.Items {
+			items = append(items, &list.Items[i])
+		}
+	case *corev1.SecretList:
+		for i := range list.Items {
+			items = append(items, &list.Items[i])
+		}
+	case *corev1.PodList:
+		for i := range list.Items {
+			items = append(items, &list.Items[i])
+		}
+	case *batchv1.JobList:
+		for i := range list.Items {
+			items = append(items, &list.Items[i])
+		}
+	case *rbacv1.RoleList:
+		for i := range list.Items {
+			items = append(items, &list.Items[i])
+		}
+	case *rbacv1.RoleBindingList:
+		for i := range list.Items {
+			items = append(items, &list.Items[i])
+		}
+	case *rbacv1.ClusterRoleList:
+		for i := range list.Items {
+			items = append(items, &list.Items[i])
+		}
+	case *rbacv1.ClusterRoleBindingList:
+		for i := range list.Items {
+			items = append(items, &list.Items[i])
+		}
+	}
+
+	return items
 }
 
 // deleteResource handles the actual deletion or dry-run logging
@@ -403,31 +464,73 @@ func (c *K8sClient) deleteResource(ctx context.Context, obj client.Object, dryRu
 	}
 }
 
-// shouldCleanupResource determines if a resource should be cleaned up based on annotations
+// shouldCleanupResource determines if a resource should be cleaned up based on annotations or orphan rules
 func (c *K8sClient) shouldCleanupResource(ctx context.Context, obj client.Object, cleanupConfig *cronschedulesv1.CleanupConfig) bool {
 	logger := log.FromContext(ctx)
 
 	annotations := obj.GetAnnotations()
-	if annotations == nil {
-		return false
-	}
 
 	// Check if cleanup annotation exists
-	cleanupValue, exists := annotations[cleanupConfig.AnnotationKey]
-	if !exists {
+	cleanupValue, hasCleanupAnnotation := "", false
+	if annotations != nil {
+		cleanupValue, hasCleanupAnnotation = annotations[cleanupConfig.AnnotationKey]
+	}
+
+	// Handle annotated resources (existing logic)
+	if hasCleanupAnnotation {
+		// If annotation value is empty, clean up immediately
+		if cleanupValue == "" {
+			logger.Info("Resource marked for immediate cleanup",
+				"name", obj.GetName(),
+				"namespace", obj.GetNamespace())
+			return true
+		}
+
+		// Parse cleanup time/duration
+		return c.isCleanupTimeReached(ctx, cleanupValue, obj)
+	}
+
+	// Handle orphan resources (new logic)
+	if cleanupConfig.CleanupOrphanResources {
+		return c.isOrphanResourceForCleanup(ctx, obj, cleanupConfig)
+	}
+
+	// Resource has no cleanup annotation and orphan cleanup is disabled
+	return false
+}
+
+// isOrphanResourceForCleanup determines if an unannotated resource should be cleaned up as orphan
+func (c *K8sClient) isOrphanResourceForCleanup(ctx context.Context, obj client.Object, cleanupConfig *cronschedulesv1.CleanupConfig) bool {
+	logger := log.FromContext(ctx)
+
+	// Parse the max age duration
+	maxAge, err := time.ParseDuration(cleanupConfig.OrphanResourceMaxAge)
+	if err != nil {
+		logger.Error(err, "Invalid orphan resource max age format", "maxAge", cleanupConfig.OrphanResourceMaxAge)
 		return false
 	}
 
-	// If annotation value is empty, clean up immediately
-	if cleanupValue == "" {
-		logger.Info("Resource marked for immediate cleanup",
+	// Calculate if resource is old enough to be considered orphan
+	now := time.Now()
+	resourceAge := now.Sub(obj.GetCreationTimestamp().Time)
+
+	if resourceAge > maxAge {
+		logger.Info("Orphan resource cleanup time reached",
 			"name", obj.GetName(),
-			"namespace", obj.GetNamespace())
+			"namespace", obj.GetNamespace(),
+			"age", resourceAge,
+			"maxAge", maxAge,
+			"created", obj.GetCreationTimestamp().Time)
 		return true
 	}
 
-	// Parse cleanup time/duration
-	return c.isCleanupTimeReached(ctx, cleanupValue, obj)
+	logger.V(1).Info("Orphan resource not old enough for cleanup",
+		"name", obj.GetName(),
+		"namespace", obj.GetNamespace(),
+		"age", resourceAge,
+		"maxAge", maxAge)
+
+	return false
 }
 
 // isCleanupTimeReached checks if the cleanup time has been reached
