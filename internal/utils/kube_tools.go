@@ -370,77 +370,69 @@ func (c *K8sClient) buildListOptions(resourceType, namespace string, cleanupConf
 func (c *K8sClient) processResourceList(ctx context.Context, objList client.ObjectList, cleanupConfig *cronschedulesv1.CleanupConfig) int32 {
 	var deleted int32
 
-	// Process each resource based on type
-	switch list := objList.(type) {
-	case *appsv1.DeploymentList:
-		for _, item := range list.Items {
-			if c.shouldCleanupResource(ctx, &item, cleanupConfig) {
-				deleted += c.deleteResource(ctx, &item, cleanupConfig.DryRun)
-			}
-		}
-	case *appsv1.StatefulSetList:
-		for _, item := range list.Items {
-			if c.shouldCleanupResource(ctx, &item, cleanupConfig) {
-				deleted += c.deleteResource(ctx, &item, cleanupConfig.DryRun)
-			}
-		}
-	case *corev1.ServiceList:
-		for _, item := range list.Items {
-			if c.shouldCleanupResource(ctx, &item, cleanupConfig) {
-				deleted += c.deleteResource(ctx, &item, cleanupConfig.DryRun)
-			}
-		}
-	case *corev1.ConfigMapList:
-		for _, item := range list.Items {
-			if c.shouldCleanupResource(ctx, &item, cleanupConfig) {
-				deleted += c.deleteResource(ctx, &item, cleanupConfig.DryRun)
-			}
-		}
-	case *corev1.SecretList:
-		for _, item := range list.Items {
-			if c.shouldCleanupResource(ctx, &item, cleanupConfig) {
-				deleted += c.deleteResource(ctx, &item, cleanupConfig.DryRun)
-			}
-		}
-	case *corev1.PodList:
-		for _, item := range list.Items {
-			if c.shouldCleanupResource(ctx, &item, cleanupConfig) {
-				deleted += c.deleteResource(ctx, &item, cleanupConfig.DryRun)
-			}
-		}
-	case *batchv1.JobList:
-		for _, item := range list.Items {
-			if c.shouldCleanupResource(ctx, &item, cleanupConfig) {
-				deleted += c.deleteResource(ctx, &item, cleanupConfig.DryRun)
-			}
-		}
-	case *rbacv1.RoleList:
-		for _, item := range list.Items {
-			if c.shouldCleanupResource(ctx, &item, cleanupConfig) {
-				deleted += c.deleteResource(ctx, &item, cleanupConfig.DryRun)
-			}
-		}
-	case *rbacv1.RoleBindingList:
-		for _, item := range list.Items {
-			if c.shouldCleanupResource(ctx, &item, cleanupConfig) {
-				deleted += c.deleteResource(ctx, &item, cleanupConfig.DryRun)
-			}
-		}
-	case *rbacv1.ClusterRoleList:
-		for _, item := range list.Items {
-			if c.shouldCleanupResource(ctx, &item, cleanupConfig) {
-				deleted += c.deleteResource(ctx, &item, cleanupConfig.DryRun)
-			}
-		}
-	case *rbacv1.ClusterRoleBindingList:
-		for _, item := range list.Items {
-			if c.shouldCleanupResource(ctx, &item, cleanupConfig) {
-				deleted += c.deleteResource(ctx, &item, cleanupConfig.DryRun)
-			}
+	// Process each resource based on type using reflection to avoid repetitive code
+	items := c.extractItemsFromList(objList)
+	for _, item := range items {
+		if c.shouldCleanupResource(ctx, item, cleanupConfig) {
+			deleted += c.deleteResource(ctx, item, cleanupConfig.DryRun)
 		}
 	}
 
 	return deleted
+}
+
+// extractItemsFromList extracts items from different list types
+func (c *K8sClient) extractItemsFromList(objList client.ObjectList) []client.Object {
+	var items []client.Object
+
+	switch list := objList.(type) {
+	case *appsv1.DeploymentList:
+		for i := range list.Items {
+			items = append(items, &list.Items[i])
+		}
+	case *appsv1.StatefulSetList:
+		for i := range list.Items {
+			items = append(items, &list.Items[i])
+		}
+	case *corev1.ServiceList:
+		for i := range list.Items {
+			items = append(items, &list.Items[i])
+		}
+	case *corev1.ConfigMapList:
+		for i := range list.Items {
+			items = append(items, &list.Items[i])
+		}
+	case *corev1.SecretList:
+		for i := range list.Items {
+			items = append(items, &list.Items[i])
+		}
+	case *corev1.PodList:
+		for i := range list.Items {
+			items = append(items, &list.Items[i])
+		}
+	case *batchv1.JobList:
+		for i := range list.Items {
+			items = append(items, &list.Items[i])
+		}
+	case *rbacv1.RoleList:
+		for i := range list.Items {
+			items = append(items, &list.Items[i])
+		}
+	case *rbacv1.RoleBindingList:
+		for i := range list.Items {
+			items = append(items, &list.Items[i])
+		}
+	case *rbacv1.ClusterRoleList:
+		for i := range list.Items {
+			items = append(items, &list.Items[i])
+		}
+	case *rbacv1.ClusterRoleBindingList:
+		for i := range list.Items {
+			items = append(items, &list.Items[i])
+		}
+	}
+
+	return items
 }
 
 // deleteResource handles the actual deletion or dry-run logging
