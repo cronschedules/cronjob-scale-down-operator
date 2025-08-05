@@ -1,0 +1,90 @@
+---
+# Test CronJobScaleDown for validating new orphan cleanup functionality
+apiVersion: cronschedules.elbazi.co/v1
+kind: CronJobScaleDown
+metadata:
+  name: test-cleanup
+  namespace: default
+spec:
+  # Run cleanup every minute for testing
+  cleanupSchedule: "0 * * * * *"
+  cleanupConfig:
+    annotationKey: "test.elbazi.co/cleanup-after"
+    resourceTypes:
+      - "ConfigMap"
+      - "Secret"
+      - "Service"
+      - "Role"
+      - "RoleBinding"
+    
+    # Test label selector
+    labelSelector:
+      test-cleanup: "enabled"
+    
+    # Enable orphan resource cleanup
+    cleanupOrphanResources: true
+    # Clean up unannotated resources older than 1 minute for testing
+    orphanResourceMaxAge: "1m"
+    
+    # Disable dry-run to test actual deletion
+    dryRun: false
+  
+  timeZone: "UTC"
+
+---
+# Test ConfigMap with annotation (should be cleaned immediately)
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: test-configmap-annotated
+  namespace: default
+  labels:
+    test-cleanup: "enabled"
+  annotations:
+    test.elbazi.co/cleanup-after: "2024-01-01T00:00:00Z"  # Past date
+data:
+  test: "data"
+
+---
+# Test ConfigMap without annotation (orphan - should be cleaned after 1 minute)
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: test-configmap-orphan
+  namespace: default
+  labels:
+    test-cleanup: "enabled"
+  # No cleanup annotation - this is an orphan
+data:
+  test: "orphan data"
+
+---
+# Test Secret with future cleanup time (should NOT be cleaned)
+apiVersion: v1
+kind: Secret
+metadata:
+  name: test-secret-future
+  namespace: default
+  labels:
+    test-cleanup: "enabled"
+  annotations:
+    test.elbazi.co/cleanup-after: "2030-01-01T00:00:00Z"  # Future date
+type: Opaque
+data:
+  test: dGVzdA==  # "test" base64 encoded
+
+---
+# Test Role with annotation (should be cleaned)
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: test-role-annotated
+  namespace: default
+  labels:
+    test-cleanup: "enabled"
+  annotations:
+    test.elbazi.co/cleanup-after: "2024-01-01T00:00:00Z"  # Past date
+rules:
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get", "list"]

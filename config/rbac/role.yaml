@@ -8,7 +8,6 @@ rules:
   - ""
   resources:
   - configmaps
-  - pods
   - secrets
   - services
   verbs:
@@ -27,14 +26,6 @@ rules:
   - patch
   - update
   - watch
-- apiGroups:
-  - batch
-  resources:
-  - jobs
-  verbs:
-  - delete
-  - get
-  - list
 - apiGroups:
   - cronschedules.elbazi.co
   resources:
