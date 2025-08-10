@@ -11,6 +11,7 @@ import (
 
 	"github.com/gorilla/mux"
 	appsv1 "k8s.io/api/apps/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -184,9 +185,13 @@ func (s *Server) buildCronJobStatus(ctx context.Context, cronJob *cronschedulesv
 	if cronJob.Spec.TargetRef != nil {
 		targetStatus, err := s.getTargetStatus(ctx, *cronJob.Spec.TargetRef)
 		if err != nil {
-			// Log the error but don't fail the entire request for missing target resources
+			// Log as info level for missing target resources (expected during normal operation)
 			// This allows the web UI to show partial status even when target resources don't exist
-			log.Error(err, "Failed to get target status, skipping target status", "targetRef", cronJob.Spec.TargetRef)
+			if apierrors.IsNotFound(err) {
+				log.V(1).Info("Target resource not found, skipping target status", "targetRef", cronJob.Spec.TargetRef)
+			} else {
+				log.Error(err, "Failed to get target status, skipping target status", "targetRef", cronJob.Spec.TargetRef)
+			}
 		} else {
 			status.TargetStatus = targetStatus
 		}

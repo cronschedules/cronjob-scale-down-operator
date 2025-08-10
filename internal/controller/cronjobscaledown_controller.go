@@ -254,6 +254,8 @@ func (r *CronJobScaleDownReconciler) validateCleanupConfig(cleanupConfig *cronsc
 		"Service":            true,
 		"ConfigMap":          true,
 		"Secret":             true,
+		"Pod":                true,
+		"Job":                true,
 		"Role":               true,
 		"RoleBinding":        true,
 		"ClusterRole":        true,
