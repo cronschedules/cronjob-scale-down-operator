@@ -2,6 +2,8 @@
 
 Kubernetes operator for scheduled scaling of Deployments and StatefulSets.
 
+<div class="artifacthub-widget" data-url="https://artifacthub.io/packages/helm/cronschedules/cronjob-scale-down-operator" data-theme="light" data-header="true" data-stars="true" data-responsive="false"><blockquote><p lang="en" dir="ltr"><b>cronjob-scale-down-operator</b>: A Kubernetes operator that automatically scales down Deployments and StatefulSets during specific time windows and provides comprehensive resource cleanup capabilities</p>&mdash; Open in <a href="https://artifacthub.io/packages/helm/cronschedules/cronjob-scale-down-operator">Artifact Hub</a></blockquote></div><script async src="https://artifacthub.io/artifacthub-widget.js"></script>
+
 ## Features
 
 - **Scaling**: Cron-based scheduling with second precision
@@ -12,7 +14,7 @@ Kubernetes operator for scheduled scaling of Deployments and StatefulSets.
 - **RBAC Support**: Extended cleanup for Roles, RoleBindings, and cluster resources (v0.4.0+)
 - **Flexible Modes**: Scaling + cleanup, or cleanup-only operation
 - **Safety Features**: Dry-run mode, label selectors, age thresholds
-- **Monitoring**: Status tracking and Web UI dashboard
+- **Monitoring**: Status tracking, Web UI dashboard, and Prometheus metrics (v0.4.1+)
 - **Enterprise Ready**: Multi-architecture container images
 
 ## Installation

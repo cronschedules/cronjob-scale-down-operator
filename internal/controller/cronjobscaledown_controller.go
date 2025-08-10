@@ -559,12 +559,15 @@ func (r *CronJobScaleDownReconciler) updateReplicaMetrics(ctx context.Context, k
 
 	var desiredReplicas, readyReplicas, currentReplicas int32
 
-	// Extract replica information based on resource type
 	switch targetRef.Kind {
 	case utils.DeploymentKind:
 		deployment := &appsv1.Deployment{}
 		err := k8sClient.Get(ctx, client.ObjectKey{Name: targetRef.Name, Namespace: targetRef.Namespace}, deployment)
 		if err != nil {
+			if apierrors.IsNotFound(err) {
+				logger.V(1).Info("Deployment not found for metrics update, skipping", "name", targetRef.Name, "namespace", targetRef.Namespace)
+				return
+			}
 			logger.Error(err, "Failed to get deployment for metrics update")
 			return
 		}
@@ -579,6 +582,10 @@ func (r *CronJobScaleDownReconciler) updateReplicaMetrics(ctx context.Context, k
 		statefulset := &appsv1.StatefulSet{}
 		err := k8sClient.Get(ctx, client.ObjectKey{Name: targetRef.Name, Namespace: targetRef.Namespace}, statefulset)
 		if err != nil {
+			if apierrors.IsNotFound(err) {
+				logger.V(1).Info("StatefulSet not found for metrics update, skipping", "name", targetRef.Name, "namespace", targetRef.Namespace)
+				return
+			}
 			logger.Error(err, "Failed to get statefulset for metrics update")
 			return
 		}

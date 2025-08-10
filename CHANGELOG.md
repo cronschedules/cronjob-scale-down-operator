@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.4.1] - 2025-08-10
 
+### Added
+- **Prometheus Metrics**: Comprehensive metrics support for monitoring and observability
+  - Scale operation metrics (up/down) with target resource details
+  - Resource cleanup metrics by type and label
+  - Reconciliation metrics with error tracking
+  - Orphan resource cleanup tracking
+  - Active resource counts and replica status
+  - Schedule execution timestamps
+  - Configuration validation error tracking
+  - Metrics exposed on `:8080/metrics` endpoint
+  - Grafana dashboard example and PromQL queries
+  - Detailed metrics documentation
+
 ### Security
 - **Dependency Updates**: Updated vulnerable dependencies to fix security issues
   - Updated `golang.org/x/oauth2` from v0.23.0 to v0.30.0 (fixes CVE-2025-22868 - HIGH)

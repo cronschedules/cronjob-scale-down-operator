@@ -2,4 +2,5 @@
 - [Installation](helm-installation.md)
 - [Web UI](webui.md)
 - [Cleanup](cleanup.md)
+- [Metrics](METRICS.md)
 - [Security](SECURITY_AUDIT.md)

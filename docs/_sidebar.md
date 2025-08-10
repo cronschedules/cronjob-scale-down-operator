@@ -5,6 +5,7 @@
 - Features
   - [Web UI](webui.md)
   - [Resource Cleanup](cleanup.md)
+  - [Prometheus Metrics](METRICS.md)
   - [Web UI Testing](TESTING_WEBUI.md)
 
 - Migration
