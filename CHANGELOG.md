@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.1] - 2025-08-10
+
+### Security
+- **Dependency Updates**: Updated vulnerable dependencies to fix security issues
+  - Updated `golang.org/x/oauth2` from v0.23.0 to v0.30.0 (fixes CVE-2025-22868 - HIGH)
+  - Updated `golang.org/x/net` from v0.30.0 to v0.43.0 (fixes CVE-2025-22872, CVE-2025-22870 - MEDIUM)
+  - Updated Go version from 1.23.0 to 1.23.12 (fixes CVE-2025-47907)
+  - Updated various other golang.org/x packages to latest secure versions
+
+### Fixed
+- **Error Handling**: Improved graceful handling of missing target resources
+  - Target resources not found errors now log as INFO instead of ERROR with stack traces
+  - Cleaner logs when scaling/cleanup operations encounter missing resources
+  - Better user experience in production environments
+
 ## [0.3.0] - 2025-07-22
 
 ### Added
