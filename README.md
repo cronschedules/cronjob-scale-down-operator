@@ -3,7 +3,7 @@
 
 A Kubernetes operator that automatically scales down Deployments and StatefulSets during specific time windows (e.g., at night or on weekends) to save resources and costs.
 
-<div class="artifacthub-widget" data-url="https://artifacthub.io/packages/helm/cronschedules/cronjob-scale-down-operator" data-theme="light" data-header="true" data-stars="true" data-responsive="false"><blockquote><p lang="en" dir="ltr"><b>cronjob-scale-down-operator</b>: A Kubernetes operator that automatically scales down Deployments and StatefulSets during specific time windows and provides comprehensive resource cleanup capabilities</p>&mdash; Open in <a href="https://artifacthub.io/packages/helm/cronschedules/cronjob-scale-down-operator">Artifact Hub</a></blockquote></div><script async src="https://artifacthub.io/artifacthub-widget.js"></script>
+[![Artifact Hub](https://img.shields.io/endpoint?url=https://artifacthub.io/badge/repository/cronschedules)](https://artifacthub.io/packages/search?repo=cronschedules)
 
 ## Features
 
