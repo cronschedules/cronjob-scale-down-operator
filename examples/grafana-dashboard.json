@@ -1,0 +1,221 @@
+{
+  "dashboard": {
+    "id": null,
+    "title": "CronJob Scale Down Operator",
+    "tags": ["kubernetes", "cronjob", "scaling"],
+    "style": "dark",
+    "timezone": "browser",
+    "panels": [
+      {
+        "title": "Scale Operations Rate",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "sum(rate(cronjob_scale_down_operations_total[5m]))",
+            "legendFormat": "Scale Down Rate",
+            "refId": "A"
+          },
+          {
+            "expr": "sum(rate(cronjob_scale_up_operations_total[5m]))",
+            "legendFormat": "Scale Up Rate", 
+            "refId": "B"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "ops"
+          }
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 0
+        }
+      },
+      {
+        "title": "Currently Scaled Down Resources",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "sum(cronjob_scaled_down_resources_current)",
+            "legendFormat": "Scaled Down",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short"
+          }
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 0
+        }
+      },
+      {
+        "title": "Cleanup Operations Rate",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "sum(rate(cronjob_cleanup_operations_total[5m])) by (namespace, name)",
+            "legendFormat": "{{namespace}}/{{name}}",
+            "refId": "A"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "Operations/sec",
+            "unit": "ops"
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 24,
+          "x": 0,
+          "y": 8
+        }
+      },
+      {
+        "title": "Resources Cleaned by Type",
+        "type": "piechart",
+        "targets": [
+          {
+            "expr": "sum(rate(cronjob_cleaned_resources_total[5m])) by (resource_type)",
+            "legendFormat": "{{resource_type}}",
+            "refId": "A"
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 16
+        }
+      },
+      {
+        "title": "Reconciliation Error Rate", 
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "sum(rate(cronjob_reconciliation_errors_total[5m])) by (error_type)",
+            "legendFormat": "{{error_type}}",
+            "refId": "A"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "Errors/sec",
+            "unit": "ops"
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 16
+        }
+      },
+      {
+        "title": "Active CronJobScaleDown Resources",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "sum(cronjob_active_resources_current) by (namespace)",
+            "legendFormat": "{{namespace}}",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short"
+          }
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 8,
+          "x": 0,
+          "y": 24
+        }
+      },
+      {
+        "title": "Target Resource Replicas",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "cronjob_target_resource_replicas_current{replica_type=\"desired\"}",
+            "legendFormat": "{{namespace}}/{{name}} - Desired",
+            "refId": "A"
+          },
+          {
+            "expr": "cronjob_target_resource_replicas_current{replica_type=\"ready\"}",
+            "legendFormat": "{{namespace}}/{{name}} - Ready",
+            "refId": "B"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "Replicas",
+            "unit": "short"
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 16,
+          "x": 8,
+          "y": 24
+        }
+      },
+      {
+        "title": "Next Scheduled Executions",
+        "type": "table",
+        "targets": [
+          {
+            "expr": "cronjob_schedule_next_execution_timestamp",
+            "legendFormat": "",
+            "refId": "A",
+            "format": "table"
+          }
+        ],
+        "transformations": [
+          {
+            "id": "organize",
+            "options": {
+              "columns": [
+                {
+                  "text": "Namespace",
+                  "value": "namespace"
+                },
+                {
+                  "text": "Name", 
+                  "value": "name"
+                },
+                {
+                  "text": "Schedule Type",
+                  "value": "schedule_type"
+                },
+                {
+                  "text": "Next Execution",
+                  "value": "Value"
+                }
+              ]
+            }
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 24,
+          "x": 0,
+          "y": 32
+        }
+      }
+    ],
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    },
+    "refresh": "30s"
+  }
+}
