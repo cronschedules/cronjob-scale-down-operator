@@ -10,12 +10,14 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	cronschedulesv1 "github.com/z4ck404/cronjob-scale-down-operator/api/v1"
+	"github.com/z4ck404/cronjob-scale-down-operator/internal/metrics"
 )
 
 // K8sClient wraps a kubernetes client
@@ -62,6 +64,10 @@ func (c *K8sClient) ScaleDownTargetResource(ctx context.Context, targetRef Targe
 		deployment := &appsv1.Deployment{}
 		err := c.Get(ctx, client.ObjectKey{Name: targetRef.Name, Namespace: targetRef.Namespace}, deployment)
 		if err != nil {
+			if apierrors.IsNotFound(err) {
+				logger.Info("Deployment not found, skipping scale down", "name", targetRef.Name, "namespace", targetRef.Namespace)
+				return nil
+			}
 			logger.Error(err, "Error getting deployment from the cluster", "name", targetRef.Name)
 			return err
 		}
@@ -89,6 +95,10 @@ func (c *K8sClient) ScaleDownTargetResource(ctx context.Context, targetRef Targe
 		statefulset := &appsv1.StatefulSet{}
 		err := c.Get(ctx, client.ObjectKey{Name: targetRef.Name, Namespace: targetRef.Namespace}, statefulset)
 		if err != nil {
+			if apierrors.IsNotFound(err) {
+				logger.Info("StatefulSet not found, skipping scale down", "name", targetRef.Name, "namespace", targetRef.Namespace)
+				return nil
+			}
 			logger.Error(err, "Error getting statefulset from the cluster", "name", targetRef.Name)
 			return err
 		}
@@ -144,6 +154,10 @@ func (c *K8sClient) GetReplicasCount(ctx context.Context, targetResource TargetO
 		deployment := &appsv1.Deployment{}
 		err := c.Get(ctx, client.ObjectKey{Name: targetResource.Name, Namespace: targetResource.Namespace}, deployment)
 		if err != nil {
+			if apierrors.IsNotFound(err) {
+				logger.Info("Deployment not found for replica count check", "name", targetResource.Name, "namespace", targetResource.Namespace)
+				return nil
+			}
 			logger.Error(err, "Error getting deployment from the cluster", "name", targetResource.Name)
 			return nil
 		}
@@ -153,6 +167,10 @@ func (c *K8sClient) GetReplicasCount(ctx context.Context, targetResource TargetO
 		statefulset := &appsv1.StatefulSet{}
 		err := c.Get(ctx, client.ObjectKey{Name: targetResource.Name, Namespace: targetResource.Namespace}, statefulset)
 		if err != nil {
+			if apierrors.IsNotFound(err) {
+				logger.Info("StatefulSet not found for replica count check", "name", targetResource.Name, "namespace", targetResource.Namespace)
+				return nil
+			}
 			logger.Error(err, "Error getting statefulset from the cluster", "name", targetResource.Name)
 			return nil
 		}
@@ -179,6 +197,10 @@ func (c *K8sClient) UpdateTargetResourceOriginalReplicasAnnotation(ctx context.C
 	}
 
 	if err := c.Get(ctx, client.ObjectKey{Name: targetResource.Name, Namespace: targetResource.Namespace}, targetResourceObject); err != nil {
+		if apierrors.IsNotFound(err) {
+			logger.Info("Target resource not found for annotation update", "name", targetResource.Name, "namespace", targetResource.Namespace, "kind", targetResource.Kind)
+			return nil
+		}
 		logger.Error(err, "Failed to get target resource for annotation", "name", targetResource.Name)
 		return fmt.Errorf("failed to get target resource: %w", err)
 	}
@@ -227,6 +249,10 @@ func (c *K8sClient) ScaleUpTargetResource(ctx context.Context, targetRef TargetO
 	}
 
 	if err := c.Get(ctx, client.ObjectKey{Name: targetRef.Name, Namespace: targetRef.Namespace}, obj); err != nil {
+		if apierrors.IsNotFound(err) {
+			logger.Info("Target resource not found, skipping scale up", "name", targetRef.Name, "namespace", targetRef.Namespace, "kind", targetRef.Kind)
+			return nil
+		}
 		logger.Error(err, "Failed to get target resource for scale up", "name", targetRef.Name)
 		return err
 	}
@@ -270,8 +296,8 @@ func (c *K8sClient) ScaleUpTargetResource(ctx context.Context, targetRef TargetO
 	return nil
 }
 
-// CleanupResources finds and deletes resources based on cleanup configuration
-func (c *K8sClient) CleanupResources(ctx context.Context, cleanupConfig *cronschedulesv1.CleanupConfig, defaultNamespace string) (int32, error) {
+// CleanupResourcesWithMetrics finds and deletes resources based on cleanup configuration and tracks metrics
+func (c *K8sClient) CleanupResourcesWithMetrics(ctx context.Context, cleanupConfig *cronschedulesv1.CleanupConfig, defaultNamespace, cronJobNamespace, cronJobName string) (int32, error) {
 	logger := log.FromContext(ctx)
 
 	if cleanupConfig == nil {
@@ -288,7 +314,7 @@ func (c *K8sClient) CleanupResources(ctx context.Context, cleanupConfig *cronsch
 
 	for _, resourceType := range cleanupConfig.ResourceTypes {
 		for _, namespace := range namespaces {
-			deleted, err := c.cleanupResourceType(ctx, resourceType, namespace, cleanupConfig)
+			deleted, err := c.cleanupResourceTypeWithMetrics(ctx, resourceType, namespace, cleanupConfig, cronJobNamespace, cronJobName)
 			if err != nil {
 				logger.Error(err, "Failed to cleanup resource type", "type", resourceType, "namespace", namespace)
 				continue
@@ -301,8 +327,8 @@ func (c *K8sClient) CleanupResources(ctx context.Context, cleanupConfig *cronsch
 	return totalDeleted, nil
 }
 
-// cleanupResourceType handles cleanup for a specific resource type in a namespace
-func (c *K8sClient) cleanupResourceType(ctx context.Context, resourceType, namespace string, cleanupConfig *cronschedulesv1.CleanupConfig) (int32, error) {
+// cleanupResourceTypeWithMetrics handles cleanup for a specific resource type in a namespace with metrics tracking
+func (c *K8sClient) cleanupResourceTypeWithMetrics(ctx context.Context, resourceType, namespace string, cleanupConfig *cronschedulesv1.CleanupConfig, cronJobNamespace, cronJobName string) (int32, error) {
 	objList, err := c.createResourceList(resourceType)
 	if err != nil {
 		return 0, err
@@ -315,7 +341,7 @@ func (c *K8sClient) cleanupResourceType(ctx context.Context, resourceType, names
 		return 0, fmt.Errorf("failed to list %s in namespace %s: %w", resourceType, namespace, err)
 	}
 
-	return c.processResourceList(ctx, objList, cleanupConfig), nil
+	return c.processResourceListWithMetrics(ctx, objList, cleanupConfig, resourceType, namespace, cronJobNamespace, cronJobName), nil
 }
 
 // createResourceList creates the appropriate list object for the resource type
@@ -366,19 +392,23 @@ func (c *K8sClient) buildListOptions(resourceType, namespace string, cleanupConf
 	return listOpts
 }
 
-// processResourceList processes a list of resources and returns the count of deleted resources
-func (c *K8sClient) processResourceList(ctx context.Context, objList client.ObjectList, cleanupConfig *cronschedulesv1.CleanupConfig) int32 {
-	var deleted int32
-
-	// Process each resource based on type using reflection to avoid repetitive code
+// processResourceListWithMetrics processes the list of resources for cleanup with metrics tracking
+func (c *K8sClient) processResourceListWithMetrics(ctx context.Context, objList client.ObjectList, cleanupConfig *cronschedulesv1.CleanupConfig, resourceType, resourceNamespace, cronJobNamespace, cronJobName string) int32 {
+	var deletedCount int32
 	items := c.extractItemsFromList(objList)
-	for _, item := range items {
-		if c.shouldCleanupResource(ctx, item, cleanupConfig) {
-			deleted += c.deleteResource(ctx, item, cleanupConfig.DryRun)
+
+	for _, obj := range items {
+		if c.shouldCleanupResource(ctx, obj, cleanupConfig) {
+			deletedCount += c.deleteResourceWithMetrics(ctx, obj, cleanupConfig.DryRun, resourceType, resourceNamespace, cronJobNamespace, cronJobName)
+
+			// Check if this is an orphan resource (no cleanup annotation)
+			if cleanupConfig.CleanupOrphanResources && c.isOrphanResourceForCleanup(ctx, obj, cleanupConfig) {
+				metrics.RecordOrphanResourceCleaned(cronJobNamespace, cronJobName, resourceType, resourceNamespace)
+			}
 		}
 	}
 
-	return deleted
+	return deletedCount
 }
 
 // extractItemsFromList extracts items from different list types
@@ -435,12 +465,9 @@ func (c *K8sClient) extractItemsFromList(objList client.ObjectList) []client.Obj
 	return items
 }
 
-// deleteResource handles the actual deletion or dry-run logging
-func (c *K8sClient) deleteResource(ctx context.Context, obj client.Object, dryRun bool) int32 {
+// deleteResourceWithMetrics handles the actual deletion or dry-run logging with metrics
+func (c *K8sClient) deleteResourceWithMetrics(ctx context.Context, obj client.Object, dryRun bool, resourceType, resourceNamespace, cronJobNamespace, cronJobName string) int32 {
 	logger := log.FromContext(ctx)
-
-	// Get resource type from the object type
-	resourceType := fmt.Sprintf("%T", obj)
 
 	if dryRun {
 		logger.Info("DRY RUN: Would delete resource",
@@ -448,20 +475,30 @@ func (c *K8sClient) deleteResource(ctx context.Context, obj client.Object, dryRu
 			"name", obj.GetName(),
 			"namespace", obj.GetNamespace())
 		return 1
-	} else {
-		if err := c.Delete(ctx, obj); err != nil {
-			logger.Error(err, "Failed to delete resource",
-				"type", resourceType,
-				"name", obj.GetName(),
-				"namespace", obj.GetNamespace())
-			return 0
-		}
-		logger.Info("Successfully deleted resource",
+	}
+
+	if err := c.Delete(ctx, obj); err != nil {
+		logger.Error(err, "Failed to delete resource",
 			"type", resourceType,
 			"name", obj.GetName(),
 			"namespace", obj.GetNamespace())
-		return 1
+		return 0
 	}
+
+	logger.Info("Resource deleted successfully",
+		"type", resourceType,
+		"name", obj.GetName(),
+		"namespace", obj.GetNamespace())
+
+	// Record metrics for cleaned resource
+	metrics.RecordCleanedResource(cronJobNamespace, cronJobName, resourceType, resourceNamespace)
+
+	// Record metrics for cleaned resource by label if labels exist
+	for labelKey, labelValue := range obj.GetLabels() {
+		metrics.RecordCleanedResourceByLabel(cronJobNamespace, cronJobName, resourceType, labelKey, labelValue)
+	}
+
+	return 1
 }
 
 // shouldCleanupResource determines if a resource should be cleaned up based on annotations or orphan rules
