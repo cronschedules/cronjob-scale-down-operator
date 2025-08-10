@@ -13,6 +13,7 @@ A Kubernetes operator that automatically scales down Deployments and StatefulSet
 - 🏷️ **Cleanup-Only Mode**: Pure cleanup functionality without scaling any target resources
 - 📊 **Status Tracking**: Monitor last execution times and current replica counts
 - 🌐 **Web UI Dashboard**: Built-in web interface to monitor all cron jobs and their status
+- 📈 **Prometheus Metrics**: Comprehensive metrics for scaling operations, cleanup activities, and system health
 - ⚡ **Efficient**: Only reconciles when needed, with smart requeue timing
 - 🛡️ **Safe Testing**: Dry-run mode for cleanup operations
 - 🔧 **Graceful Error Handling**: Continues operation even when target resources are missing
@@ -425,6 +426,25 @@ kubectl logs -n cronjob-scale-down-operator-system deployment/cronjob-scale-down
 kubectl get deployment my-deployment -w
 kubectl get statefulset my-statefulset -w
 ```
+
+### Prometheus Metrics
+
+The operator exposes comprehensive Prometheus metrics for monitoring scaling operations, cleanup activities, and system health:
+
+```bash
+# Access metrics endpoint
+kubectl port-forward -n cronjob-scale-down-operator-system deployment/cronjob-scale-down-operator-controller-manager 8443:8443
+curl -k https://localhost:8443/metrics
+```
+
+**Key Metrics Categories:**
+- **Scaling Operations**: `cronjob_scale_down_operations_total`, `cronjob_scale_up_operations_total`
+- **Cleanup Operations**: `cronjob_cleaned_resources_total`, `cronjob_cleanup_operations_total`
+- **Resource Status**: `cronjob_target_resource_replicas_current`, `cronjob_scaled_down_resources_current`
+- **System Health**: `cronjob_reconciliation_errors_total`, `cronjob_reconciliation_duration_seconds`
+- **Schedules**: `cronjob_schedule_next_execution_timestamp`, `cronjob_schedule_last_execution_timestamp`
+
+For detailed metrics documentation, PromQL queries, and Grafana dashboard examples, see [METRICS.md](./docs/METRICS.md).
 
 ## Web UI Dashboard
 

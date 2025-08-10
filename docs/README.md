@@ -159,6 +159,7 @@ helm install cronjob-scale-down-operator cronschedules/cronjob-scale-down-operat
 - [Helm Installation](helm-installation.md)
 - [Web UI Guide](webui.md)
 - [Cleanup Feature](cleanup.md)
+- [Prometheus Metrics](METRICS.md)
 - [Charts Migration](charts-migration.md)
 
 > **📖 Chart Documentation:** For detailed Helm chart documentation, values, and configuration options, visit the [Charts Repository](https://github.com/cronschedules/charts/tree/main/cronjob-scale-down-operator).
@@ -485,6 +486,18 @@ kubectl logs -l app.kubernetes.io/name=cronjob-scale-down-operator
 kubectl get deployment my-deployment -w
 kubectl get statefulset my-statefulset -w
 ```
+
+### Prometheus Metrics
+
+The operator exposes comprehensive metrics for observability:
+
+```bash
+# Access metrics
+kubectl port-forward -n cronjob-scale-down-operator-system deployment/cronjob-scale-down-operator-controller-manager 8443:8443
+curl -k https://localhost:8443/metrics
+```
+
+For detailed metrics documentation, see [METRICS.md](METRICS.md).
 
 ## Development
 

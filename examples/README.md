@@ -14,6 +14,8 @@ This directory contains various examples demonstrating different use cases for t
 | `statefulset-example.yaml` | StatefulSet scaling example | Database and stateful application scaling |
 | `cleanup-only-example.yaml` | **Cleanup-only mode** | **Pure resource cleanup without scaling** |
 | `webui-demo.yaml` | Web UI demonstration | Complete example with deployment and scaling |
+| `metrics-testing.md` | **Metrics testing guide** | **Testing and accessing Prometheus metrics** |
+| `grafana-dashboard.json` | **Grafana dashboard** | **Pre-built dashboard for monitoring** |
 
 ## Cleanup Examples
 
@@ -81,3 +83,21 @@ The operator supports cron expressions with seconds precision:
 - `"*/30 * * * * *"` - Every 30 seconds (testing)
 - `"0 0 18 * * 1-5"` - Weekdays at 6:00 PM
 - `"0 0 8 * * 1-5"` - Weekdays at 8:00 AM
+
+## Monitoring Examples
+
+### Metrics Testing
+
+See [metrics-testing.md](metrics-testing.md) for comprehensive examples of:
+- Accessing Prometheus metrics
+- Verifying scaling and cleanup metrics
+- Testing scenarios with sample resources
+- Troubleshooting metrics issues
+
+### Grafana Dashboard
+
+Import [grafana-dashboard.json](grafana-dashboard.json) into Grafana for a pre-built monitoring dashboard featuring:
+- Scale operations rate and status
+- Cleanup operations and resource counts
+- Error rates and reconciliation metrics
+- Resource status and scheduled executions
