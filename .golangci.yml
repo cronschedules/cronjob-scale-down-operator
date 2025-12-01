@@ -3,28 +3,6 @@ version: "2"
 run:
   timeout: 5m
 
-issues:
-  # don't skip warning about doc comments
-  # don't exclude the default set of lint
-  exclude-use-default: false
-  # restore some of the defaults
-  exclude-rules:
-    - path: "api/*"
-      linters:
-        - lll
-    - path: "internal/"
-      linters:
-        - dupl
-        - lll
-    - path: "test/"
-      linters:
-        - lll
-        - revive
-        - staticcheck
-    # Exclude kubebuilder annotations from comment-spacings rule
-    - source: "^//\\+kubebuilder:"
-      linters:
-        - revive
 linters:
   enable:
     - errcheck
@@ -49,6 +27,27 @@ linters:
         - "-ST1000"
         - "-ST1001"
         - "-ST1003"
+  exclusions:
+    # Exclusion presets (none = don't exclude defaults)
+    presets: []
+    # Path-based exclusions
+    rules:
+      - path: "api/"
+        linters:
+          - lll
+      - path: "internal/"
+        linters:
+          - dupl
+          - lll
+      - path: "test/"
+        linters:
+          - lll
+          - revive
+          - staticcheck
+      # Exclude kubebuilder annotations from comment-spacings rule
+      - source: "^//\\+kubebuilder:"
+        linters:
+          - revive
 
 formatters:
   enable:
