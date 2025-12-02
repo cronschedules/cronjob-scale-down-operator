@@ -1,50 +1,55 @@
+version: "2"
+
 run:
   timeout: 5m
-  allow-parallel-runners: true
 
-issues:
-  # don't skip warning about doc comments
-  # don't exclude the default set of lint
-  exclude-use-default: false
-  # restore some of the defaults
-  exclude-rules:
-    - path: "api/*"
-      linters:
-        - lll
-    - path: "internal/*"
-      linters:
-        - dupl
-        - lll
-    # Exclude kubebuilder annotations from comment-spacings rule
-    - source: "^//\\+kubebuilder:"
-      linters:
-        - revive
 linters:
-  disable-all: true
   enable:
-    - dupl
     - errcheck
     - copyloopvar
     - ginkgolinter
     - goconst
     - gocyclo
-    - gofmt
-    - goimports
-    - gosimple
     - govet
     - ineffassign
-    - lll
     - misspell
     - nakedret
     - prealloc
-    - revive
-    - staticcheck
-    - typecheck
     - unconvert
     - unparam
     - unused
-
-linters-settings:
-  revive:
+  settings:
+    staticcheck:
+      checks:
+        - "all"
+        - "-QF1004"
+        - "-QF1008"
+        - "-ST1000"
+        - "-ST1001"
+        - "-ST1003"
+  exclusions:
+    # Exclusion presets (none = don't exclude defaults)
+    presets: []
+    # Path-based exclusions
     rules:
-      - name: comment-spacings
+      - path: "api/"
+        linters:
+          - lll
+      - path: "internal/"
+        linters:
+          - dupl
+          - lll
+      - path: "test/"
+        linters:
+          - lll
+          - revive
+          - staticcheck
+      # Exclude kubebuilder annotations from comment-spacings rule
+      - source: "^//\\+kubebuilder:"
+        linters:
+          - revive
+
+formatters:
+  enable:
+    - gofmt
+    - goimports

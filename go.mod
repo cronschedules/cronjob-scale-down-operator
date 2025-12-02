@@ -1,8 +1,8 @@
 module github.com/z4ck404/cronjob-scale-down-operator
 
-go 1.23.12
+go 1.24.10
 
-godebug default=go1.23
+godebug default=go1.24
 
 require (
 	github.com/go-logr/logr v1.4.2
