@@ -40,10 +40,28 @@ class CronJobDashboard {
         }
     }
 
+    // Escapes API-provided values before they are interpolated into HTML.
+    // CronJobScaleDown spec fields are user-controlled and must never be rendered as markup.
+    escapeHtml(value) {
+        if (value === null || value === undefined) return '';
+        return String(value)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+    toCount(value) {
+        const n = Number(value);
+        return Number.isFinite(n) && n >= 0 ? Math.floor(n) : 0;
+    }
+
     formatDateTime(dateString) {
         if (!dateString) return 'Never';
         const date = new Date(dateString);
-        return date.toLocaleString();
+        if (isNaN(date.getTime())) return 'Never';
+        return this.escapeHtml(date.toLocaleString());
     }
 
     getStatusIcon(ready) {
@@ -69,6 +87,8 @@ class CronJobDashboard {
     }
 
     createReplicaBar(ready, desired) {
+        ready = this.toCount(ready);
+        desired = this.toCount(desired);
         if (desired === 0) {
             return `
                 <div class="replica-info">
@@ -81,7 +101,7 @@ class CronJobDashboard {
             `;
         }
 
-        const percentage = desired > 0 ? (ready / desired) * 100 : 0;
+        const percentage = Math.min(100, desired > 0 ? (ready / desired) * 100 : 0);
         let fillClass = '';
         let statusText = '';
         
@@ -116,15 +136,16 @@ class CronJobDashboard {
         const replicaBar = isCleanupOnly 
             ? '<div class="info-item"><span class="info-value">No target resource</span></div>'
             : this.createReplicaBar(targetStatus?.readyReplicas, targetStatus?.desiredReplicas);
+        const esc = (v) => this.escapeHtml(v);
         
         return `
             <div class="col-md-6 col-lg-4 mb-4">
                 <div class="card h-100">
                     <div class="card-header">
                         <h5 class="card-title mb-0">
-                            <i class="fas fa-cog"></i> ${cronJob.name}
+                            <i class="fas fa-cog"></i> ${esc(cronJob.name)}
                         </h5>
-                        <small>${cronJob.namespace}</small>
+                        <small>${esc(cronJob.namespace)}</small>
                     </div>
                     <div class="card-body">
                         <div class="mb-3">
@@ -134,15 +155,15 @@ class CronJobDashboard {
                             ${isCleanupOnly ? 
                                 '<div class="info-item"><span class="info-value text-muted">Cleanup-only mode - no target resource</span></div>' :
                                 `<div class="info-item">
-                                    <span class="resource-kind-badge">${cronJob.targetRef.kind}</span>
+                                    <span class="resource-kind-badge">${esc(cronJob.targetRef.kind)}</span>
                                 </div>
                                 <div class="info-item">
                                     <span class="info-label">Name:</span>
-                                    <span class="info-value">${cronJob.targetRef.name}</span>
+                                    <span class="info-value">${esc(cronJob.targetRef.name)}</span>
                                 </div>
                                 <div class="info-item">
                                     <span class="info-label">Namespace:</span>
-                                    <span class="info-value">${cronJob.targetRef.namespace}</span>
+                                    <span class="info-value">${esc(cronJob.targetRef.namespace)}</span>
                                 </div>`
                             }
                         </div>
@@ -171,20 +192,20 @@ class CronJobDashboard {
                             ${isCleanupOnly ? 
                                 `<div class="info-item">
                                     <span class="info-label">Cleanup:</span>
-                                    ${cronJob.cleanupSchedule ? `<span class="cron-schedule">${cronJob.cleanupSchedule}</span>` : '<span class="text-muted">Not set</span>'}
+                                    ${cronJob.cleanupSchedule ? `<span class="cron-schedule">${esc(cronJob.cleanupSchedule)}</span>` : '<span class="text-muted">Not set</span>'}
                                 </div>` :
                                 `<div class="info-item">
                                     <span class="info-label">Scale Down:</span>
-                                    ${cronJob.scaleDownSchedule ? `<span class="cron-schedule">${cronJob.scaleDownSchedule}</span>` : '<span class="text-muted">Not set</span>'}
+                                    ${cronJob.scaleDownSchedule ? `<span class="cron-schedule">${esc(cronJob.scaleDownSchedule)}</span>` : '<span class="text-muted">Not set</span>'}
                                 </div>
                                 <div class="info-item">
                                     <span class="info-label">Scale Up:</span>
-                                    ${cronJob.scaleUpSchedule ? `<span class="cron-schedule">${cronJob.scaleUpSchedule}</span>` : '<span class="text-muted">Not set</span>'}
+                                    ${cronJob.scaleUpSchedule ? `<span class="cron-schedule">${esc(cronJob.scaleUpSchedule)}</span>` : '<span class="text-muted">Not set</span>'}
                                 </div>`
                             }
                             <div class="info-item">
                                 <span class="info-label">Timezone:</span>
-                                <span class="info-value">${cronJob.timeZone}</span>
+                                <span class="info-value">${esc(cronJob.timeZone)}</span>
                             </div>
                         </div>
                         

@@ -65,6 +65,8 @@ func main() {
 	var secureMetrics bool
 	var enableHTTP2 bool
 	var webuiAddr string
+	var allowCrossNamespace bool
+	var allowClusterScopedCleanup bool
 	var tlsOpts []func(*tls.Config)
 	flag.StringVar(&metricsAddr, "metrics-bind-address", "0", "The address the metrics endpoint binds to. "+
 		"Use :8443 for HTTPS or :8080 for HTTP, or leave as 0 to disable the metrics service.")
@@ -83,8 +85,16 @@ func main() {
 	flag.StringVar(&metricsCertKey, "metrics-cert-key", "tls.key", "The name of the metrics server key file.")
 	flag.BoolVar(&enableHTTP2, "enable-http2", false,
 		"If set, HTTP/2 will be enabled for the metrics and webhook servers")
-	flag.StringVar(&webuiAddr, "webui-addr", ":8082",
-		"The address the web UI binds to. Use :8443 for HTTPS or :8080 for HTTP.")
+	flag.StringVar(&webuiAddr, "webui-addr", "127.0.0.1:8082",
+		"The address the web UI binds to. The UI has no authentication, so it defaults to loopback "+
+			"(reachable via kubectl port-forward). Use :8082 to expose it on all interfaces, or 0 to disable it.")
+	flag.BoolVar(&allowCrossNamespace, "allow-cross-namespace", false,
+		"Allow a CronJobScaleDown to target workloads (spec.targetRef.namespace) and clean up resources "+
+			"(spec.cleanupConfig.namespaces) outside its own namespace. Only enable this when every principal "+
+			"that can create CronJobScaleDown resources is trusted with cluster-wide scale and delete rights.")
+	flag.BoolVar(&allowClusterScopedCleanup, "allow-cluster-scoped-cleanup", false,
+		"Allow cleanup of cluster-scoped resource types (ClusterRole, ClusterRoleBinding). "+
+			"Only enable this when every principal that can create CronJobScaleDown resources is a cluster admin.")
 	opts := zap.Options{
 		Development: true,
 	}
@@ -207,8 +217,10 @@ func main() {
 	}
 
 	if err = (&controller.CronJobScaleDownReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
+		Client:                    mgr.GetClient(),
+		Scheme:                    mgr.GetScheme(),
+		AllowCrossNamespace:       allowCrossNamespace,
+		AllowClusterScopedCleanup: allowClusterScopedCleanup,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "CronJobScaleDown")
 		os.Exit(1)
@@ -241,13 +253,25 @@ func main() {
 	}
 
 	// Start web UI server
-	webUIServer := webui.NewServer(mgr.GetClient())
-	go func() {
-		setupLog.Info("starting web UI server", "address", webuiAddr)
-		if err := webUIServer.Start(webuiAddr); err != nil {
-			setupLog.Error(err, "problem running web UI")
-		}
-	}()
+	if webuiAddr != "" && webuiAddr != "0" {
+		webUIServer := webui.NewServer(mgr.GetClient(), allowCrossNamespace)
+		go func() {
+			setupLog.Info("starting web UI server", "address", webuiAddr)
+			if err := webUIServer.Start(webuiAddr); err != nil {
+				setupLog.Error(err, "problem running web UI")
+			}
+		}()
+	} else {
+		setupLog.Info("web UI disabled")
+	}
+
+	if allowCrossNamespace {
+		setupLog.Info("WARNING: cross-namespace targeting and cleanup are enabled; any principal able to create " +
+			"CronJobScaleDown resources can scale or delete resources in every namespace")
+	}
+	if allowClusterScopedCleanup {
+		setupLog.Info("WARNING: cleanup of cluster-scoped resources (ClusterRole, ClusterRoleBinding) is enabled")
+	}
 
 	setupLog.Info("starting manager")
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {

@@ -13,6 +13,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
@@ -20,8 +21,9 @@ import (
 )
 
 type Server struct {
-	client client.Client
-	router *mux.Router
+	client              client.Client
+	router              *mux.Router
+	allowCrossNamespace bool
 }
 
 type CronJobStatus struct {
@@ -55,16 +57,43 @@ type TargetStatus struct {
 	LastUpdateTime    *time.Time `json:"lastUpdateTime,omitempty"`
 }
 
-func NewServer(client client.Client) *Server {
+// NewServer creates the dashboard server. When allowCrossNamespace is false, target workload status is
+// only read for targets in the CronJobScaleDown's own namespace, matching the controller's policy.
+func NewServer(client client.Client, allowCrossNamespace bool) *Server {
 	s := &Server{
-		client: client,
-		router: mux.NewRouter(),
+		client:              client,
+		router:              mux.NewRouter(),
+		allowCrossNamespace: allowCrossNamespace,
 	}
 	s.setupRoutes()
 	return s
 }
 
+// contentSecurityPolicy restricts the dashboard to its own scripts and the pinned CDN assets,
+// so that any markup injected through CronJobScaleDown fields cannot execute script.
+const contentSecurityPolicy = "default-src 'none'; " +
+	"script-src 'self' https://cdn.jsdelivr.net; " +
+	"style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://fonts.googleapis.com; " +
+	"font-src https://cdnjs.cloudflare.com https://fonts.gstatic.com; " +
+	"img-src 'self' data:; " +
+	"connect-src 'self'; " +
+	"base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+
+func securityHeaders(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		h := w.Header()
+		h.Set("Content-Security-Policy", contentSecurityPolicy)
+		h.Set("X-Content-Type-Options", "nosniff")
+		h.Set("X-Frame-Options", "DENY")
+		h.Set("Referrer-Policy", "no-referrer")
+		h.Set("Cache-Control", "no-store")
+		next.ServeHTTP(w, r)
+	})
+}
+
 func (s *Server) setupRoutes() {
+	s.router.Use(securityHeaders)
+
 	// API routes
 	api := s.router.PathPrefix("/api/v1").Subrouter()
 	api.HandleFunc("/cronjobs", s.getCronJobs).Methods("GET")
@@ -89,13 +118,13 @@ func (s *Server) setupRoutes() {
 }
 
 func (s *Server) getCronJobs(w http.ResponseWriter, r *http.Request) {
-	ctx := context.Background()
+	ctx := r.Context()
 	log := log.FromContext(ctx)
 
 	var cronJobList cronschedulesv1.CronJobScaleDownList
 	if err := s.client.List(ctx, &cronJobList); err != nil {
 		log.Error(err, "Failed to list CronJobScaleDown resources")
-		http.Error(w, fmt.Sprintf("Failed to list cron jobs: %v", err), http.StatusInternalServerError)
+		http.Error(w, "Failed to list cron jobs", http.StatusInternalServerError)
 		return
 	}
 
@@ -122,20 +151,24 @@ func (s *Server) getCronJob(w http.ResponseWriter, r *http.Request) {
 	namespace := vars["namespace"]
 	name := vars["name"]
 
-	ctx := context.Background()
+	ctx := r.Context()
 	log := log.FromContext(ctx)
 
 	var cronJob cronschedulesv1.CronJobScaleDown
 	if err := s.client.Get(ctx, types.NamespacedName{Name: name, Namespace: namespace}, &cronJob); err != nil {
+		if apierrors.IsNotFound(err) {
+			http.Error(w, "Cron job not found", http.StatusNotFound)
+			return
+		}
 		log.Error(err, "Failed to get CronJobScaleDown", "name", name, "namespace", namespace)
-		http.Error(w, fmt.Sprintf("Failed to get cron job: %v", err), http.StatusNotFound)
+		http.Error(w, "Failed to get cron job", http.StatusInternalServerError)
 		return
 	}
 
 	status, err := s.buildCronJobStatus(ctx, &cronJob)
 	if err != nil {
 		log.Error(err, "Failed to build status for cron job", "name", name, "namespace", namespace)
-		http.Error(w, fmt.Sprintf("Failed to build status: %v", err), http.StatusInternalServerError)
+		http.Error(w, "Failed to build status", http.StatusInternalServerError)
 		return
 	}
 
@@ -181,8 +214,8 @@ func (s *Server) buildCronJobStatus(ctx context.Context, cronJob *cronschedulesv
 		status.LastCleanupTime = &cronJob.Status.LastCleanupTime.Time
 	}
 
-	// Get target resource status only for scaling resources
-	if cronJob.Spec.TargetRef != nil {
+	// Get target resource status only for scaling resources within the allowed namespace scope
+	if cronJob.Spec.TargetRef != nil && (s.allowCrossNamespace || cronJob.Spec.TargetRef.Namespace == cronJob.Namespace) {
 		targetStatus, err := s.getTargetStatus(ctx, *cronJob.Spec.TargetRef)
 		if err != nil {
 			// Log as info level for missing target resources (expected during normal operation)
@@ -219,7 +252,7 @@ func (s *Server) getDeploymentStatus(ctx context.Context, targetRef cronschedule
 
 	status := &TargetStatus{
 		Ready:             deployment.Status.ReadyReplicas == deployment.Status.Replicas,
-		DesiredReplicas:   *deployment.Spec.Replicas,
+		DesiredReplicas:   ptr.Deref(deployment.Spec.Replicas, 0),
 		AvailableReplicas: deployment.Status.AvailableReplicas,
 		ReadyReplicas:     deployment.Status.ReadyReplicas,
 	}
@@ -242,7 +275,7 @@ func (s *Server) getStatefulSetStatus(ctx context.Context, targetRef cronschedul
 
 	status := &TargetStatus{
 		Ready:             statefulset.Status.ReadyReplicas == statefulset.Status.Replicas,
-		DesiredReplicas:   *statefulset.Spec.Replicas,
+		DesiredReplicas:   ptr.Deref(statefulset.Spec.Replicas, 0),
 		AvailableReplicas: statefulset.Status.Replicas,
 		ReadyReplicas:     statefulset.Status.ReadyReplicas,
 	}
@@ -263,8 +296,8 @@ func (s *Server) serveUI(w http.ResponseWriter, r *http.Request) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CronJob Scale Down Operator - Dashboard</title>
     <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-1BmE4kWBq78iYhFldvKuhfTAU6auU8tT94WrHftjDbrCEXSU1oBoqyl2QvZ6jIW3" crossorigin="anonymous">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet" integrity="sha384-3B6NwesSXE7YJlcLI9RpRqGf2p/EgVH8BgoKTaUrmKNDkHPStTQ3EyoYjCGXaOTS" crossorigin="anonymous">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link href="/static/styles.css" rel="stylesheet">
 </head>
@@ -312,7 +345,7 @@ func (s *Server) serveUI(w http.ResponseWriter, r *http.Request) {
         <i class="fas fa-sync-alt"></i>
     </button>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-ka7Sk0Gln4gmtz2MlQnikT1wXgYsOg+OMhuP+IlRH9sENBO0LRn5q+8nbTov4+1p" crossorigin="anonymous"></script>
     <script src="/static/dashboard.js"></script>
 </body>
 </html>`
@@ -327,7 +360,15 @@ func (s *Server) serveUI(w http.ResponseWriter, r *http.Request) {
 func (s *Server) Start(addr string) error {
 	log := log.Log.WithName("webui")
 	log.Info("Starting web UI server", "address", addr)
-	err := http.ListenAndServe(addr, s.router)
+	srv := &http.Server{
+		Addr:              addr,
+		Handler:           s.router,
+		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		WriteTimeout:      30 * time.Second,
+		IdleTimeout:       120 * time.Second,
+	}
+	err := srv.ListenAndServe()
 	if err != nil {
 		log.Error(err, "Failed to start web UI server", "address", addr, "possible causes", "port conflict, insufficient permissions, or invalid address")
 	}

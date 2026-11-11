@@ -62,6 +62,19 @@ var (
 type CronJobScaleDownReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
+
+	// AllowCrossNamespace permits targetRef and cleanupConfig.namespaces to reference namespaces
+	// other than the CronJobScaleDown's own. The operator runs with cluster-wide RBAC, so enabling
+	// this grants every principal able to create a CronJobScaleDown cluster-wide scale/delete rights.
+	AllowCrossNamespace bool
+
+	// AllowClusterScopedCleanup permits cleanup of cluster-scoped kinds (ClusterRole, ClusterRoleBinding).
+	AllowClusterScopedCleanup bool
+}
+
+var clusterScopedCleanupTypes = map[string]bool{
+	"ClusterRole":        true,
+	"ClusterRoleBinding": true,
 }
 
 func (r *CronJobScaleDownReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -158,7 +171,65 @@ func (r *CronJobScaleDownReconciler) validateSpec(cronJobScaleDown *cronschedule
 		}
 	}
 
+	return r.validateNamespaceScope(cronJobScaleDown)
+}
+
+// validateNamespaceScope enforces that a namespaced CronJobScaleDown only acts on its own namespace
+// and on namespaced resource kinds, unless the operator was explicitly started with a wider policy.
+func (r *CronJobScaleDownReconciler) validateNamespaceScope(cronJobScaleDown *cronschedulesv1.CronJobScaleDown) error {
+	ownNamespace := cronJobScaleDown.Namespace
+
+	if !r.AllowCrossNamespace {
+		if targetRef := cronJobScaleDown.Spec.TargetRef; targetRef != nil && targetRef.Namespace != ownNamespace {
+			return fmt.Errorf("targetRef.namespace %q must match the CronJobScaleDown namespace %q "+
+				"(cross-namespace targeting is disabled; see --allow-cross-namespace)", targetRef.Namespace, ownNamespace)
+		}
+		if cleanupConfig := cronJobScaleDown.Spec.CleanupConfig; cleanupConfig != nil {
+			for _, ns := range cleanupConfig.Namespaces {
+				if ns != ownNamespace {
+					return fmt.Errorf("cleanupConfig.namespaces entry %q must match the CronJobScaleDown namespace %q "+
+						"(cross-namespace cleanup is disabled; see --allow-cross-namespace)", ns, ownNamespace)
+				}
+			}
+		}
+	}
+
+	if !r.AllowClusterScopedCleanup && cronJobScaleDown.Spec.CleanupConfig != nil {
+		for _, resourceType := range cronJobScaleDown.Spec.CleanupConfig.ResourceTypes {
+			if clusterScopedCleanupTypes[resourceType] {
+				return fmt.Errorf("cleanup of cluster-scoped resource type %q is disabled; see --allow-cluster-scoped-cleanup", resourceType)
+			}
+		}
+	}
+
 	return nil
+}
+
+// isTargetInScope re-checks the namespace policy immediately before a scaling action.
+func (r *CronJobScaleDownReconciler) isTargetInScope(cronJobScaleDown *cronschedulesv1.CronJobScaleDown) bool {
+	return r.AllowCrossNamespace || cronJobScaleDown.Spec.TargetRef.Namespace == cronJobScaleDown.Namespace
+}
+
+// scopedCleanupConfig returns a copy of the cleanup config restricted to what the operator policy allows.
+// It is applied right before deletion so the policy holds even if validation is bypassed or changed.
+func (r *CronJobScaleDownReconciler) scopedCleanupConfig(cronJobScaleDown *cronschedulesv1.CronJobScaleDown) *cronschedulesv1.CleanupConfig {
+	scoped := cronJobScaleDown.Spec.CleanupConfig.DeepCopy()
+
+	if !r.AllowCrossNamespace {
+		scoped.Namespaces = []string{cronJobScaleDown.Namespace}
+	}
+
+	if !r.AllowClusterScopedCleanup {
+		allowedTypes := make([]string, 0, len(scoped.ResourceTypes))
+		for _, resourceType := range scoped.ResourceTypes {
+			if !clusterScopedCleanupTypes[resourceType] {
+				allowedTypes = append(allowedTypes, resourceType)
+			}
+		}
+		scoped.ResourceTypes = allowedTypes
+	}
+
+	return scoped
 }
 
 func (r *CronJobScaleDownReconciler) validateCronSchedule(schedule string) error {
@@ -395,6 +466,12 @@ func (r *CronJobScaleDownReconciler) executeScaling(ctx context.Context, k8sClie
 
 	targetRef := cronJobScaleDown.Spec.TargetRef
 
+	if !r.isTargetInScope(cronJobScaleDown) {
+		logger.Error(nil, "Refusing to scale a target outside the CronJobScaleDown namespace",
+			"targetNamespace", targetRef.Namespace)
+		return false, nil
+	}
+
 	// Debug logging
 	logger.Info("Checking scaling conditions",
 		"now", now.Format(time.RFC3339),
@@ -514,7 +591,8 @@ func (r *CronJobScaleDownReconciler) executeCleanup(ctx context.Context, k8sClie
 
 	// Use the CronJobScaleDown's namespace as default
 	defaultNamespace := cronJobScaleDown.Namespace
-	cleanedCount, err := k8sClient.CleanupResourcesWithMetrics(ctx, cronJobScaleDown.Spec.CleanupConfig, defaultNamespace, cronJobScaleDown.Namespace, cronJobScaleDown.Name)
+	cleanupConfig := r.scopedCleanupConfig(cronJobScaleDown)
+	cleanedCount, err := k8sClient.CleanupResourcesWithMetrics(ctx, cleanupConfig, defaultNamespace, cronJobScaleDown.Namespace, cronJobScaleDown.Name)
 	if err != nil {
 		logger.Error(err, "Error during resource cleanup")
 		metrics.RecordReconciliationError(cronJobScaleDown.Namespace, cronJobScaleDown.Name, "cleanup_error")
