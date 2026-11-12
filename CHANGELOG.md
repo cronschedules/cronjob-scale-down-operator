@@ -5,6 +5,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] - Unreleased
+
+### Security
+- **Namespace confinement (breaking)**: A `CronJobScaleDown` can now only scale targets (`spec.targetRef.namespace`)
+  and clean up resources (`spec.cleanupConfig.namespaces`) in its own namespace. Previously any user able to create a
+  `CronJobScaleDown` could use the operator's cluster-wide service account to scale or delete resources in every
+  namespace. Set the new `--allow-cross-namespace` flag to restore the previous behavior on trusted, single-tenant clusters.
+- **Cluster-scoped cleanup (breaking)**: Cleanup of `ClusterRole` and `ClusterRoleBinding` now requires the new
+  `--allow-cluster-scoped-cleanup` flag.
+- The policy is enforced both during spec validation and again right before scaling/deleting.
+- **Web UI**: listens on `127.0.0.1:8082` by default (still reachable with `kubectl port-forward`) because it has no
+  authentication; use `--webui-addr=:8082` to expose it or `--webui-addr=0` to disable it.
+- **Web UI**: fixed stored XSS by HTML-escaping all resource fields in the dashboard; added `Content-Security-Policy`,
+  `X-Frame-Options`, `X-Content-Type-Options` and `Referrer-Policy` headers; added Subresource Integrity to CDN assets;
+  API errors no longer echo raw Kubernetes API messages; added HTTP server timeouts; target status is only read
+  for targets in the resource's own namespace unless `--allow-cross-namespace` is set.
+- **CRD validation**: `targetRef.name`/`namespace` and `cleanupConfig.namespaces` must be valid DNS names,
+  `cleanupConfig.resourceTypes` is an enum, and schedules/timezone have length limits.
+- **CI**: the release workflow no longer interpolates the `workflow_dispatch` tag input into shell and validates it.
+
+### Fixed
+- `dist/install.yaml` was regenerated; its CRD was missing the cleanup fields.
+- Web UI no longer panics when a target Deployment/StatefulSet has no `spec.replicas`.
+
 ## [0.4.1] - 2025-08-10
 
 ### Added

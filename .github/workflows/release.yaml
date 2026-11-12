@@ -84,16 +84,24 @@ jobs:
 
       - name: Get release tag
         id: get_tag
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_TAG: ${{ github.event.inputs.tag }}
+        shell: bash
         run: |
-          if [ "${{ github.event_name }}" = "release" ]; then
-            TAG=${GITHUB_REF#refs/tags/}
-            echo "IMAGE_TAG=$TAG" >> $GITHUB_ENV
-            echo "tag=$TAG" >> $GITHUB_OUTPUT
+          if [ "$EVENT_NAME" = "release" ]; then
+            TAG="${GITHUB_REF#refs/tags/}"
           else
-            TAG="${{ github.event.inputs.tag }}"
-            echo "IMAGE_TAG=$TAG" >> $GITHUB_ENV
-            echo "tag=$TAG" >> $GITHUB_OUTPUT
+            TAG="$INPUT_TAG"
           fi
+          # Match the whole string (grep is line-based and would accept "latest\n<injected lines>").
+          semver_re='^(latest|v?[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?)$'
+          if [[ "$TAG" == *$'\n'* || "$TAG" == *$'\r'* || ! "$TAG" =~ $semver_re ]]; then
+            echo "::error::Invalid release tag: must be 'latest' or a semantic version"
+            exit 1
+          fi
+          echo "IMAGE_TAG=$TAG" >> "$GITHUB_ENV"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@988b5a0280414f521da01fcc63a27aeeb4b104db # v3.6.1

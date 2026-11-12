@@ -47,13 +47,82 @@ spec:
           spec:
             description: CronJobScaleDownSpec defines the desired state of CronJobScaleDown.
             properties:
+              cleanupConfig:
+                description: Cleanup configuration for deleting resources based on
+                  annotations
+                properties:
+                  annotationKey:
+                    description: Annotation key that marks resources for cleanup
+                    type: string
+                  cleanupOrphanResources:
+                    default: false
+                    description: CleanupOrphanResources enables cleanup of resources
+                      without the cleanup annotation
+                    type: boolean
+                  dryRun:
+                    default: false
+                    description: DryRun mode - if true, only logs what would be deleted
+                      without actually deleting
+                    type: boolean
+                  labelSelector:
+                    additionalProperties:
+                      type: string
+                    description: Label selector to further filter resources for cleanup
+                    type: object
+                  namespaces:
+                    description: |-
+                      Namespaces to search for resources to cleanup (defaults to same namespace as the CronJobScaleDown).
+                      Entries other than the CronJobScaleDown's own namespace are rejected unless the operator runs
+                      with --allow-cross-namespace.
+                    items:
+                      maxLength: 63
+                      pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
+                      type: string
+                    type: array
+                  orphanResourceMaxAge:
+                    description: |-
+                      OrphanResourceMaxAge defines the maximum age for orphan resources before cleanup
+                      Resources older than this duration without cleanup annotation will be deleted
+                      Format: duration string (e.g., "24h", "7d", "168h")
+                    type: string
+                  resourceTypes:
+                    description: |-
+                      Resource types to cleanup (e.g., ["Deployment", "StatefulSet", "Service", "ConfigMap"]).
+                      ClusterRole and ClusterRoleBinding require the operator flag --allow-cluster-scoped-cleanup.
+                    items:
+                      enum:
+                      - Deployment
+                      - StatefulSet
+                      - Service
+                      - ConfigMap
+                      - Secret
+                      - Pod
+                      - Job
+                      - Role
+                      - RoleBinding
+                      - ClusterRole
+                      - ClusterRoleBinding
+                      type: string
+                    minItems: 1
+                    type: array
+                required:
+                - annotationKey
+                - resourceTypes
+                type: object
+              cleanupSchedule:
+                description: Cron schedule for cleaning up resources (e.g., "0 0 *
+                  * 0" for every Sunday)
+                maxLength: 100
+                type: string
               scaleDownSchedule:
                 description: Cron schedule for scaling down (e.g., "0 22 * * *" for
                   10 PM daily)
+                maxLength: 100
                 type: string
               scaleUpSchedule:
                 description: Cron schedule for scaling back up (e.g., "0 6 * * *"
                   for 6 AM daily)
+                maxLength: 100
                 type: string
               targetRef:
                 description: Target resource to scale (Deployment/StatefulSet)
@@ -70,9 +139,15 @@ spec:
                     type: string
                   name:
                     description: Name of the target resource
+                    maxLength: 253
+                    pattern: ^[a-z0-9]([-a-z0-9.]*[a-z0-9])?$
                     type: string
                   namespace:
-                    description: Namespace of the target resource
+                    description: |-
+                      Namespace of the target resource. Must equal the CronJobScaleDown's namespace unless the
+                      operator runs with --allow-cross-namespace.
+                    maxLength: 63
+                    pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
                     type: string
                 required:
                 - apiVersion
@@ -83,9 +158,10 @@ spec:
               timeZone:
                 default: UTC
                 description: Timezone (e.g., "America/New_York", "UTC")
+                maxLength: 64
+                pattern: ^[A-Za-z][A-Za-z0-9_+-]*(?:/[A-Za-z0-9_+-]+)*$
                 type: string
             required:
-            - targetRef
             - timeZone
             type: object
           status:
@@ -95,6 +171,16 @@ spec:
                 description: CurrentReplicas is the current number of replicas
                 format: int32
                 type: integer
+              lastCleanupResourceCount:
+                description: LastCleanupResourceCount is the number of resources cleaned
+                  up in the last cleanup operation
+                format: int32
+                type: integer
+              lastCleanupTime:
+                description: LastCleanupTime is the time when the cleanup was last
+                  performed
+                format: date-time
+                type: string
               lastScaleDownTime:
                 description: LastScaleDownTime is the time when the scale down was
                   last performed
@@ -239,16 +325,27 @@ metadata:
   name: cronjob-scale-down-operator-manager-role
 rules:
 - apiGroups:
+  - ""
+  resources:
+  - configmaps
+  - secrets
+  - services
+  verbs:
+  - delete
+  - get
+  - list
+- apiGroups:
   - apps
   resources:
   - deployments
   - statefulsets
   verbs:
+  - delete
   - get
   - list
-  - watch
-  - update
   - patch
+  - update
+  - watch
 - apiGroups:
   - cronschedules.elbazi.co
   resources:
@@ -275,6 +372,17 @@ rules:
   - get
   - patch
   - update
+- apiGroups:
+  - rbac.authorization.k8s.io
+  resources:
+  - clusterrolebindings
+  - clusterroles
+  - rolebindings
+  - roles
+  verbs:
+  - delete
+  - get
+  - list
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
@@ -426,6 +534,7 @@ spec:
           capabilities:
             drop:
             - ALL
+          readOnlyRootFilesystem: true
         volumeMounts: []
       securityContext:
         runAsNonRoot: true

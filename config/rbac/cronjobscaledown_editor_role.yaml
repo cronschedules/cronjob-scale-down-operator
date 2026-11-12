@@ -4,6 +4,13 @@
 # Grants permissions to create, update, and delete resources within the cronschedules.elbazi.co.
 # This role is intended for users who need to manage these resources
 # but should not control RBAC or manage permissions for others.
+#
+# SECURITY NOTE: the operator acts on CronJobScaleDown resources with its own service account.
+# A user bound to this role in a namespace can therefore scale Deployments/StatefulSets and delete
+# the resource types listed in cleanupConfig.resourceTypes (including Secrets, Roles, RoleBindings)
+# within that namespace. If the operator runs with --allow-cross-namespace or
+# --allow-cluster-scoped-cleanup, that reach extends to every namespace / cluster-scoped RBAC objects,
+# so only bind this role to fully trusted users in that configuration.
 
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole

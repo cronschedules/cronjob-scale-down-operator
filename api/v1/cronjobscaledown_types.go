@@ -28,14 +28,17 @@ type CronJobScaleDownSpec struct {
 
 	// Cron schedule for scaling down (e.g., "0 22 * * *" for 10 PM daily)
 	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:MaxLength=100
 	ScaleDownSchedule string `json:"scaleDownSchedule,omitempty"`
 
 	// Cron schedule for scaling back up (e.g., "0 6 * * *" for 6 AM daily)
 	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:MaxLength=100
 	ScaleUpSchedule string `json:"scaleUpSchedule,omitempty"`
 
 	// Cron schedule for cleaning up resources (e.g., "0 0 * * 0" for every Sunday)
 	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:MaxLength=100
 	CleanupSchedule string `json:"cleanupSchedule,omitempty"`
 
 	// Cleanup configuration for deleting resources based on annotations
@@ -45,15 +48,22 @@ type CronJobScaleDownSpec struct {
 	// Timezone (e.g., "America/New_York", "UTC")
 	// +kubebuilder:validation:Required
 	// +kubebuilder:default:="UTC"
+	// +kubebuilder:validation:MaxLength=64
+	// +kubebuilder:validation:Pattern=`^[A-Za-z][A-Za-z0-9_+-]*(?:/[A-Za-z0-9_+-]+)*$`
 	TimeZone string `json:"timeZone"`
 }
 
 type TargetRef struct {
 	// Name of the target resource
 	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MaxLength=253
+	// +kubebuilder:validation:Pattern=`^[a-z0-9]([-a-z0-9.]*[a-z0-9])?$`
 	Name string `json:"name"`
-	// Namespace of the target resource
+	// Namespace of the target resource. Must equal the CronJobScaleDown's namespace unless the
+	// operator runs with --allow-cross-namespace.
 	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MaxLength=63
+	// +kubebuilder:validation:Pattern=`^[a-z0-9]([-a-z0-9]*[a-z0-9])?$`
 	Namespace string `json:"namespace"`
 	// Kind of the target resource (Deployment, StatefulSet)
 	// +kubebuilder:validation:Required
@@ -66,17 +76,23 @@ type TargetRef struct {
 }
 
 type CleanupConfig struct {
-	// Namespaces to search for resources to cleanup (defaults to same namespace as the CronJobScaleDown)
+	// Namespaces to search for resources to cleanup (defaults to same namespace as the CronJobScaleDown).
+	// Entries other than the CronJobScaleDown's own namespace are rejected unless the operator runs
+	// with --allow-cross-namespace.
 	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:items:MaxLength=63
+	// +kubebuilder:validation:items:Pattern=`^[a-z0-9]([-a-z0-9]*[a-z0-9])?$`
 	Namespaces []string `json:"namespaces,omitempty"`
 
 	// Annotation key that marks resources for cleanup
 	// +kubebuilder:validation:Required
 	AnnotationKey string `json:"annotationKey"`
 
-	// Resource types to cleanup (e.g., ["Deployment", "StatefulSet", "Service", "ConfigMap"])
+	// Resource types to cleanup (e.g., ["Deployment", "StatefulSet", "Service", "ConfigMap"]).
+	// ClusterRole and ClusterRoleBinding require the operator flag --allow-cluster-scoped-cleanup.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MinItems=1
+	// +kubebuilder:validation:items:Enum=Deployment;StatefulSet;Service;ConfigMap;Secret;Pod;Job;Role;RoleBinding;ClusterRole;ClusterRoleBinding
 	ResourceTypes []string `json:"resourceTypes"`
 
 	// Label selector to further filter resources for cleanup

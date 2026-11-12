@@ -62,9 +62,13 @@ spec:
                     description: Label selector to further filter resources for cleanup
                     type: object
                   namespaces:
-                    description: Namespaces to search for resources to cleanup (defaults
-                      to same namespace as the CronJobScaleDown)
+                    description: |-
+                      Namespaces to search for resources to cleanup (defaults to same namespace as the CronJobScaleDown).
+                      Entries other than the CronJobScaleDown's own namespace are rejected unless the operator runs
+                      with --allow-cross-namespace.
                     items:
+                      maxLength: 63
+                      pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
                       type: string
                     type: array
                   orphanResourceMaxAge:
@@ -74,9 +78,22 @@ spec:
                       Format: duration string (e.g., "24h", "7d", "168h")
                     type: string
                   resourceTypes:
-                    description: Resource types to cleanup (e.g., ["Deployment", "StatefulSet",
-                      "Service", "ConfigMap"])
+                    description: |-
+                      Resource types to cleanup (e.g., ["Deployment", "StatefulSet", "Service", "ConfigMap"]).
+                      ClusterRole and ClusterRoleBinding require the operator flag --allow-cluster-scoped-cleanup.
                     items:
+                      enum:
+                      - Deployment
+                      - StatefulSet
+                      - Service
+                      - ConfigMap
+                      - Secret
+                      - Pod
+                      - Job
+                      - Role
+                      - RoleBinding
+                      - ClusterRole
+                      - ClusterRoleBinding
                       type: string
                     minItems: 1
                     type: array
@@ -87,14 +104,17 @@ spec:
               cleanupSchedule:
                 description: Cron schedule for cleaning up resources (e.g., "0 0 *
                   * 0" for every Sunday)
+                maxLength: 100
                 type: string
               scaleDownSchedule:
                 description: Cron schedule for scaling down (e.g., "0 22 * * *" for
                   10 PM daily)
+                maxLength: 100
                 type: string
               scaleUpSchedule:
                 description: Cron schedule for scaling back up (e.g., "0 6 * * *"
                   for 6 AM daily)
+                maxLength: 100
                 type: string
               targetRef:
                 description: Target resource to scale (Deployment/StatefulSet)
@@ -111,9 +131,15 @@ spec:
                     type: string
                   name:
                     description: Name of the target resource
+                    maxLength: 253
+                    pattern: ^[a-z0-9]([-a-z0-9.]*[a-z0-9])?$
                     type: string
                   namespace:
-                    description: Namespace of the target resource
+                    description: |-
+                      Namespace of the target resource. Must equal the CronJobScaleDown's namespace unless the
+                      operator runs with --allow-cross-namespace.
+                    maxLength: 63
+                    pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
                     type: string
                 required:
                 - apiVersion
@@ -124,6 +150,8 @@ spec:
               timeZone:
                 default: UTC
                 description: Timezone (e.g., "America/New_York", "UTC")
+                maxLength: 64
+                pattern: ^[A-Za-z][A-Za-z0-9_+-]*(?:/[A-Za-z0-9_+-]+)*$
                 type: string
             required:
             - timeZone

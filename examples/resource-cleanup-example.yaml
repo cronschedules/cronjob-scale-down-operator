@@ -30,12 +30,12 @@ spec:
       - "ConfigMap"
       - "Secret"
     
-    # Optional: Only cleanup resources in these namespaces
-    # If not specified, uses the same namespace as this CronJobScaleDown
+    # Optional: Only cleanup resources in these namespaces.
+    # If not specified, uses the same namespace as this CronJobScaleDown.
+    # Namespaces other than this resource's own namespace are rejected unless the
+    # operator runs with --allow-cross-namespace.
     namespaces:
       - "default"
-      - "test"
-      - "lab"
     
     # Optional: Additional label selector to filter resources
     labelSelector:

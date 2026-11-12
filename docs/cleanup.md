@@ -75,8 +75,8 @@ cleanupConfig:
     # RBAC Resources (v0.4.0+)
     - "Role"
     - "RoleBinding"
-    - "ClusterRole"
-    - "ClusterRoleBinding"
+    - "ClusterRole"         # requires --allow-cluster-scoped-cleanup
+    - "ClusterRoleBinding"  # requires --allow-cluster-scoped-cleanup
 ```
 
 ## Annotation-Based Cleanup

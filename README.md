@@ -186,6 +186,8 @@ spec:
       - "Secret"
       - "Service"
       - "Deployment"
+    # Namespaces other than this resource's own namespace require the
+    # operator flag --allow-cross-namespace (see "Security Model").
     namespaces:
       - "test"
       - "staging"
@@ -223,6 +225,22 @@ spec:
     dryRun: false
   timeZone: "UTC"
 ```
+
+## Security Model
+
+The operator runs with a cluster-wide service account that can scale workloads and delete the resource
+types supported by cleanup. Anyone who can create a `CronJobScaleDown` can direct that authority, so the
+operator confines each resource to its own namespace by default:
+
+| Flag | Default | Effect |
+|------|---------|--------|
+| `--allow-cross-namespace` | `false` | Allow `spec.targetRef.namespace` and `spec.cleanupConfig.namespaces` to reference namespaces other than the `CronJobScaleDown`'s own. |
+| `--allow-cluster-scoped-cleanup` | `false` | Allow cleanup of `ClusterRole` and `ClusterRoleBinding`. |
+| `--webui-addr` | `127.0.0.1:8082` | Web UI listen address. The UI is unauthenticated, so it only listens on loopback by default (reachable with `kubectl port-forward`). Use `:8082` to expose it, or `0` to disable it. |
+
+Resources that violate the policy are rejected with a validation error in the operator logs and are never acted upon.
+Only enable the `--allow-*` flags when every principal able to create `CronJobScaleDown` resources is trusted with
+cluster-wide scale and delete rights (for example, single-tenant clusters where only admins manage these resources).
 
 ## Configuration
 
@@ -290,8 +308,11 @@ spec:
       - "Role"
       - "RoleBinding"
       # Note: ClusterRole and ClusterRoleBinding are also supported (cluster-scoped)
+      # but require the operator flag --allow-cluster-scoped-cleanup
     
     # Optional: Limit cleanup to specific namespaces
+    # Namespaces other than this resource's own namespace require the
+    # operator flag --allow-cross-namespace (see "Security Model").
     namespaces:
       - "test"
       - "lab"
@@ -364,7 +385,7 @@ This configuration will:
 **Supported Resource Types:**
 - Standard resources: `Deployment`, `StatefulSet`, `Service`, `ConfigMap`, `Secret`
 - Workload resources: `Pod`, `Job` (useful for cleaning up failed/evicted resources)
-- RBAC resources: `Role`, `RoleBinding`, `ClusterRole`, `ClusterRoleBinding`
+- RBAC resources: `Role`, `RoleBinding`, `ClusterRole`, `ClusterRoleBinding` (cluster-scoped kinds require `--allow-cluster-scoped-cleanup`)
 
 **Safety considerations:**
 - Orphan cleanup is opt-in (disabled by default)
@@ -456,15 +477,17 @@ The operator includes a built-in web dashboard that provides real-time monitorin
 
 ### Accessing the Web UI
 
-By default, the web UI is available at `http://localhost:8082` when running the operator locally. In a Kubernetes cluster, you can access it by:
+The web UI has no authentication. By default it only listens on `127.0.0.1:8082` inside the operator pod. In a Kubernetes cluster, you can access it by:
 
-1. **Port forwarding** (for development/testing):
+1. **Port forwarding** (recommended, works with the default loopback address):
    ```bash
    kubectl port-forward -n cronjob-scale-down-operator-system deployment/cronjob-scale-down-operator-controller-manager 8082:8082
    ```
    Then visit `http://localhost:8082`
 
-2. **Configure ingress** (for production):
+2. **Configure ingress** (start the operator with `--webui-addr=:8082` and put the UI behind an
+   authenticating proxy, e.g. oauth2-proxy, or restrict access with a NetworkPolicy; the UI shows
+   resources from every namespace):
    ```yaml
    apiVersion: networking.k8s.io/v1
    kind: Ingress
@@ -499,7 +522,8 @@ By default, the web UI is available at `http://localhost:8082` when running the 
 You can customize the web UI port using the `--webui-addr` flag:
 
 ```bash
-./manager --webui-addr=:8080
+./manager --webui-addr=127.0.0.1:8080   # loopback only (default address is 127.0.0.1:8082)
+./manager --webui-addr=0                # disable the web UI
 ```
 
 For more details about the web UI, see the [Web UI Documentation](./docs/webui.md).

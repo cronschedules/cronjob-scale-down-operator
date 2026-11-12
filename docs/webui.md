@@ -13,13 +13,22 @@ Built-in web dashboard to monitor CronJobScaleDown resources.
 
 ## Access
 
-Default: http://localhost:8082
+Default listen address: `127.0.0.1:8082` (loopback only). The dashboard has no authentication and shows
+resources from every namespace, so reach it with `kubectl port-forward ... 8082:8082` and open
+http://localhost:8082.
 
-### Custom Port
+### Custom Address
 
 ```bash
-./bin/manager --webui-addr=:8080
+./bin/manager --webui-addr=:8082   # expose on all interfaces (put behind an authenticating proxy / NetworkPolicy)
+./bin/manager --webui-addr=0       # disable the web UI
 ```
+
+### Security
+
+- Responses carry a strict `Content-Security-Policy`, `X-Frame-Options: DENY` and `X-Content-Type-Options: nosniff`.
+- All resource fields are HTML-escaped before rendering.
+- Target workload status is only shown for targets in the resource's own namespace unless the operator runs with `--allow-cross-namespace`.
 
 ### Helm Configuration
 
