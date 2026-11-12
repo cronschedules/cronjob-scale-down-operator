@@ -159,7 +159,7 @@ spec:
                 default: UTC
                 description: Timezone (e.g., "America/New_York", "UTC")
                 maxLength: 64
-                pattern: ^[A-Za-z]+(?:[_/][A-Za-z0-9_+-]+)*$
+                pattern: ^[A-Za-z][A-Za-z0-9_+-]*(?:/[A-Za-z0-9_+-]+)*$
                 type: string
             required:
             - timeZone

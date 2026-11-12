@@ -87,13 +87,16 @@ jobs:
         env:
           EVENT_NAME: ${{ github.event_name }}
           INPUT_TAG: ${{ github.event.inputs.tag }}
+        shell: bash
         run: |
           if [ "$EVENT_NAME" = "release" ]; then
             TAG="${GITHUB_REF#refs/tags/}"
           else
             TAG="$INPUT_TAG"
           fi
-          if ! printf '%s' "$TAG" | grep -Eq '^(latest|v?[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?)$'; then
+          # Match the whole string (grep is line-based and would accept "latest\n<injected lines>").
+          semver_re='^(latest|v?[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?)$'
+          if [[ "$TAG" == *$'\n'* || "$TAG" == *$'\r'* || ! "$TAG" =~ $semver_re ]]; then
             echo "::error::Invalid release tag: must be 'latest' or a semantic version"
             exit 1
           fi

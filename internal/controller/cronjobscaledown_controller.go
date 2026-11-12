@@ -39,8 +39,10 @@ import (
 )
 
 var (
-	// Valid timezone regex pattern - restricts to safe IANA timezone names
-	validTimezonePattern = regexp.MustCompile(`^[A-Za-z]+(?:[_/][A-Za-z0-9_+-]+)*$`)
+	// Valid timezone regex pattern - restricts to safe IANA timezone names (e.g. "America/New_York",
+	// "Etc/GMT+5", "EST5EDT"); dots are excluded so path traversal like "../" is impossible.
+	// Keep in sync with the TimeZone kubebuilder Pattern marker in api/v1.
+	validTimezonePattern = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9_+-]*(?:/[A-Za-z0-9_+-]+)*$`)
 	// Maximum schedule length to prevent extremely long schedules
 	maxScheduleLength = 100
 )

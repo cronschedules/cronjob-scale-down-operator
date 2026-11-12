@@ -183,3 +183,26 @@ var _ = Describe("CronJobScaleDown namespace scope policy", func() {
 		})
 	})
 })
+
+var _ = Describe("Timezone validation", func() {
+	DescribeTable("validateTimezone",
+		func(tz string, valid bool) {
+			err := (&CronJobScaleDownReconciler{}).validateTimezone(tz)
+			if valid {
+				Expect(err).NotTo(HaveOccurred())
+			} else {
+				Expect(err).To(HaveOccurred())
+			}
+		},
+		Entry("UTC", "UTC", true),
+		Entry("region/city", "America/New_York", true),
+		Entry("three-level zone", "America/Argentina/Buenos_Aires", true),
+		Entry("Etc offset", "Etc/GMT+5", true),
+		Entry("tzdb name with digits", "EST5EDT", true),
+		Entry("tzdb name with digits", "PST8PDT", true),
+		Entry("path traversal", "../etc/passwd", false),
+		Entry("embedded dot segment", "UTC/../x", false),
+		Entry("leading slash", "/UTC", false),
+		Entry("unknown zone", "Mars/Olympus_Mons", false),
+	)
+})

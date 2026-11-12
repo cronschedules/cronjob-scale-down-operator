@@ -86,6 +86,23 @@ class CronJobDashboard {
         </span>`;
     }
 
+    // Shown when the API omits targetStatus (target missing, unreadable, or outside the
+    // allowed namespace scope) so it is not mistaken for a scaled-down workload.
+    getUnavailableBadge() {
+        return `<span class="status-badge not-ready">
+            <i class="fas fa-question-circle"></i> Status Unavailable
+        </span>`;
+    }
+
+    createUnavailableReplicaInfo() {
+        return `
+            <div class="replica-info">
+                <span class="replica-text">–</span>
+                <small class="text-muted">Target status unavailable</small>
+            </div>
+        `;
+    }
+
     createReplicaBar(ready, desired) {
         ready = this.toCount(ready);
         desired = this.toCount(desired);
@@ -132,10 +149,14 @@ class CronJobDashboard {
         const isCleanupOnly = !cronJob.targetRef;
         const statusBadge = isCleanupOnly 
             ? '<span class="badge status-cleanup">Cleanup Only</span>'
-            : this.getStatusBadge(targetStatus?.ready, cronJob.currentReplicas);
+            : targetStatus
+                ? this.getStatusBadge(targetStatus.ready, cronJob.currentReplicas)
+                : this.getUnavailableBadge();
         const replicaBar = isCleanupOnly 
             ? '<div class="info-item"><span class="info-value">No target resource</span></div>'
-            : this.createReplicaBar(targetStatus?.readyReplicas, targetStatus?.desiredReplicas);
+            : targetStatus
+                ? this.createReplicaBar(targetStatus.readyReplicas, targetStatus.desiredReplicas)
+                : this.createUnavailableReplicaInfo();
         const esc = (v) => this.escapeHtml(v);
         
         return `

@@ -49,7 +49,7 @@ type CronJobScaleDownSpec struct {
 	// +kubebuilder:validation:Required
 	// +kubebuilder:default:="UTC"
 	// +kubebuilder:validation:MaxLength=64
-	// +kubebuilder:validation:Pattern=`^[A-Za-z]+(?:[_/][A-Za-z0-9_+-]+)*$`
+	// +kubebuilder:validation:Pattern=`^[A-Za-z][A-Za-z0-9_+-]*(?:/[A-Za-z0-9_+-]+)*$`
 	TimeZone string `json:"timeZone"`
 }
 
