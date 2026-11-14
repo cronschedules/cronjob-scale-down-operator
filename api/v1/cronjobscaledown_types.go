@@ -154,7 +154,3 @@ type CronJobScaleDownList struct {
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []CronJobScaleDown `json:"items"`
 }
-
-func init() {
-	SchemeBuilder.Register(&CronJobScaleDown{}, &CronJobScaleDownList{})
-}

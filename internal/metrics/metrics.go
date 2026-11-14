@@ -21,6 +21,25 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/metrics"
 )
 
+// Prometheus label names shared across the operator's metrics.
+const (
+	labelNamespace         = "namespace"
+	labelName              = "name"
+	labelTargetKind        = "target_kind"
+	labelTargetName        = "target_name"
+	labelTargetNamespace   = "target_namespace"
+	labelOperationType     = "operation_type"
+	labelResourceType      = "resource_type"
+	labelResourceNamespace = "resource_namespace"
+	labelLabelKey          = "label_key"
+	labelLabelValue        = "label_value"
+	labelResult            = "result"
+	labelErrorType         = "error_type"
+	labelReplicaType       = "replica_type"
+	labelScheduleType      = "schedule_type"
+	labelValidationType    = "validation_type"
+)
+
 var (
 	// Scaling operation metrics
 	ScaleDownOperationsTotal = prometheus.NewCounterVec(
@@ -28,7 +47,7 @@ var (
 			Name: "cronjob_scale_down_operations_total",
 			Help: "Total number of scale down operations performed",
 		},
-		[]string{"namespace", "name", "target_kind", "target_name", "target_namespace"},
+		[]string{labelNamespace, labelName, labelTargetKind, labelTargetName, labelTargetNamespace},
 	)
 
 	ScaleUpOperationsTotal = prometheus.NewCounterVec(
@@ -36,7 +55,7 @@ var (
 			Name: "cronjob_scale_up_operations_total",
 			Help: "Total number of scale up operations performed",
 		},
-		[]string{"namespace", "name", "target_kind", "target_name", "target_namespace"},
+		[]string{labelNamespace, labelName, labelTargetKind, labelTargetName, labelTargetNamespace},
 	)
 
 	CurrentScaledDownResources = prometheus.NewGaugeVec(
@@ -44,7 +63,7 @@ var (
 			Name: "cronjob_scaled_down_resources_current",
 			Help: "Current number of resources that are scaled down",
 		},
-		[]string{"namespace", "name", "target_kind", "target_name", "target_namespace"},
+		[]string{labelNamespace, labelName, labelTargetKind, labelTargetName, labelTargetNamespace},
 	)
 
 	ScaleOperationDuration = prometheus.NewHistogramVec(
@@ -53,7 +72,7 @@ var (
 			Help:    "Duration of scale operations in seconds",
 			Buckets: prometheus.DefBuckets,
 		},
-		[]string{"operation_type", "namespace", "name"},
+		[]string{labelOperationType, labelNamespace, labelName},
 	)
 
 	// Cleanup operation metrics
@@ -62,7 +81,7 @@ var (
 			Name: "cronjob_cleanup_operations_total",
 			Help: "Total number of cleanup operations performed",
 		},
-		[]string{"namespace", "name"},
+		[]string{labelNamespace, labelName},
 	)
 
 	CleanedResourcesTotal = prometheus.NewCounterVec(
@@ -70,7 +89,7 @@ var (
 			Name: "cronjob_cleaned_resources_total",
 			Help: "Total number of resources cleaned up",
 		},
-		[]string{"namespace", "name", "resource_type", "resource_namespace"},
+		[]string{labelNamespace, labelName, labelResourceType, labelResourceNamespace},
 	)
 
 	CleanedResourcesByLabelTotal = prometheus.NewCounterVec(
@@ -78,7 +97,7 @@ var (
 			Name: "cronjob_cleaned_resources_by_label_total",
 			Help: "Total number of resources cleaned up by label selectors",
 		},
-		[]string{"namespace", "name", "resource_type", "label_key", "label_value"},
+		[]string{labelNamespace, labelName, labelResourceType, labelLabelKey, labelLabelValue},
 	)
 
 	CleanupOperationDuration = prometheus.NewHistogramVec(
@@ -87,7 +106,7 @@ var (
 			Help:    "Duration of cleanup operations in seconds",
 			Buckets: prometheus.DefBuckets,
 		},
-		[]string{"namespace", "name"},
+		[]string{labelNamespace, labelName},
 	)
 
 	OrphanResourcesCleanedTotal = prometheus.NewCounterVec(
@@ -95,7 +114,7 @@ var (
 			Name: "cronjob_orphan_resources_cleaned_total",
 			Help: "Total number of orphan resources cleaned up (resources without cleanup annotations)",
 		},
-		[]string{"namespace", "name", "resource_type", "resource_namespace"},
+		[]string{labelNamespace, labelName, labelResourceType, labelResourceNamespace},
 	)
 
 	// Reconciliation metrics
@@ -104,7 +123,7 @@ var (
 			Name: "cronjob_reconciliations_total",
 			Help: "Total number of reconciliations performed",
 		},
-		[]string{"namespace", "name", "result"},
+		[]string{labelNamespace, labelName, labelResult},
 	)
 
 	ReconciliationDuration = prometheus.NewHistogramVec(
@@ -113,7 +132,7 @@ var (
 			Help:    "Duration of reconciliation operations in seconds",
 			Buckets: prometheus.DefBuckets,
 		},
-		[]string{"namespace", "name"},
+		[]string{labelNamespace, labelName},
 	)
 
 	ReconciliationErrors = prometheus.NewCounterVec(
@@ -121,7 +140,7 @@ var (
 			Name: "cronjob_reconciliation_errors_total",
 			Help: "Total number of reconciliation errors",
 		},
-		[]string{"namespace", "name", "error_type"},
+		[]string{labelNamespace, labelName, labelErrorType},
 	)
 
 	// Resource status metrics
@@ -130,7 +149,7 @@ var (
 			Name: "cronjob_active_resources_current",
 			Help: "Current number of active CronJobScaleDown resources",
 		},
-		[]string{"namespace"},
+		[]string{labelNamespace},
 	)
 
 	TargetResourceReplicas = prometheus.NewGaugeVec(
@@ -138,7 +157,7 @@ var (
 			Name: "cronjob_target_resource_replicas_current",
 			Help: "Current number of replicas for target resources",
 		},
-		[]string{"namespace", "name", "target_kind", "target_name", "target_namespace", "replica_type"},
+		[]string{labelNamespace, labelName, labelTargetKind, labelTargetName, labelTargetNamespace, labelReplicaType},
 	)
 
 	// Schedule metrics
@@ -147,7 +166,7 @@ var (
 			Name: "cronjob_schedule_next_execution_timestamp",
 			Help: "Unix timestamp of the next scheduled execution",
 		},
-		[]string{"namespace", "name", "schedule_type"},
+		[]string{labelNamespace, labelName, labelScheduleType},
 	)
 
 	LastExecutionTime = prometheus.NewGaugeVec(
@@ -155,7 +174,7 @@ var (
 			Name: "cronjob_schedule_last_execution_timestamp",
 			Help: "Unix timestamp of the last execution",
 		},
-		[]string{"namespace", "name", "schedule_type"},
+		[]string{labelNamespace, labelName, labelScheduleType},
 	)
 
 	// Configuration metrics
@@ -164,7 +183,7 @@ var (
 			Name: "cronjob_configuration_validation_errors_total",
 			Help: "Total number of configuration validation errors",
 		},
-		[]string{"namespace", "name", "validation_type"},
+		[]string{labelNamespace, labelName, labelValidationType},
 	)
 
 	DryRunOperationsTotal = prometheus.NewCounterVec(
@@ -172,7 +191,7 @@ var (
 			Name: "cronjob_dry_run_operations_total",
 			Help: "Total number of dry run operations performed",
 		},
-		[]string{"namespace", "name", "operation_type"},
+		[]string{labelNamespace, labelName, labelOperationType},
 	)
 )
 

@@ -67,19 +67,15 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
       
-      - name: Get the version
-        id: get_version_push
-        run: |
-          VERSION=$(cat VERSION)
-          echo "VERSION=$VERSION" >> $GITHUB_ENV
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@988b5a0280414f521da01fcc63a27aeeb4b104db # v3.6.1
 
-      - name: Build and push Docker image to both registries
+      # Pushes a rolling `main` snapshot only. Versioned tags and `latest` are published as
+      # multi-arch images by release.yaml; pushing VERSION here would overwrite them with a
+      # single-arch image on every commit to main.
+      - name: Build and push main snapshot to both registries
         run: |
           make docker-build
           make docker-push-all
         env:
-          IMAGE_TAG: ${{ steps.get_version_push.outputs.version }}
+          IMAGE_TAG: main

@@ -18,43 +18,82 @@ env:
   DOCKERHUB_REGISTRY: docker.io
   IMAGE_NAME: cronschedules/cronjob-scale-down-operator
 
+# Releases created by this workflow use GITHUB_TOKEN, which does not trigger a new
+# `release: published` workflow run. The multi-arch image build and the `latest` tag
+# therefore run in the same workflow run, right after a new release is created.
 jobs:
   create-release:
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     permissions:
       contents: write
-    
+    outputs:
+      created: ${{ steps.check_release.outputs.created }}
+      version: ${{ steps.get_version.outputs.version }}
+
     steps:
       - name: Checkout code
         uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
 
       - name: Get version
         id: get_version
+        shell: bash
         run: |
-          # Read version file and trim whitespace
-          VERSION=$(cat VERSION | tr -d '\n')
-          # Set both environment variable and step output
-          echo "VERSION=$VERSION" >> $GITHUB_ENV
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          VERSION="$(tr -d '[:space:]' < VERSION)"
+          semver_re='^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$'
+          if [[ ! "$VERSION" =~ $semver_re ]]; then
+            echo "::error::VERSION must be a semantic version without a 'v' prefix"
+            exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Check whether the release already exists
+        id: check_release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ steps.get_version.outputs.version }}
+        run: |
+          if gh release view "v${VERSION}" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
+            echo "Release v${VERSION} already exists; skipping release and image publishing"
+            echo "created=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "created=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Set up Go
+        if: steps.check_release.outputs.created == 'true'
+        uses: actions/setup-go@0a12ed9d6a96ab950c8f026ed9f722fe0da7ef32 # v5.0.2
+        with:
+          go-version-file: 'go.mod'
 
       - name: Build
+        if: steps.check_release.outputs.created == 'true'
         run: make build
 
       - name: Create Release
-        id: create_release
+        if: steps.check_release.outputs.created == 'true'
         uses: softprops/action-gh-release@c062e08bd532815e2082a85e87e3ef29c3e6d191 # v2.0.8
         with:
           name: Release ${{ steps.get_version.outputs.version }}
           tag_name: v${{ steps.get_version.outputs.version }}
+          target_commitish: ${{ github.sha }}
           draft: false
-          prerelease: false
+          prerelease: ${{ contains(steps.get_version.outputs.version, '-') }}
           generate_release_notes: true
           token: ${{ secrets.GITHUB_TOKEN }}
 
   build-and-push-multiarch:
     runs-on: ubuntu-latest
-    if: github.event_name == 'release' || github.event_name == 'workflow_dispatch'
+    needs: create-release
+    # Runs after a new release is created from main, for manually published releases,
+    # and for manual dispatches. `always()` is needed because create-release is skipped
+    # for the release and workflow_dispatch events.
+    if: >-
+      always() && (
+        (github.event_name == 'push' && needs.create-release.result == 'success' && needs.create-release.outputs.created == 'true') ||
+        github.event_name == 'release' ||
+        github.event_name == 'workflow_dispatch'
+      )
     permissions:
       contents: read
       packages: write
@@ -62,11 +101,6 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
-
-      - name: Set up Go
-        uses: actions/setup-go@0a12ed9d6a96ab950c8f026ed9f722fe0da7ef32 # v5.0.2
-        with:
-          go-version-file: 'go.mod'
 
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@9780b0c442fbb1117ed29e0efdff1e18412f7567 # v3.3.0
@@ -82,26 +116,35 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      - name: Get release tag
+      - name: Get image tag
         id: get_tag
         env:
           EVENT_NAME: ${{ github.event_name }}
           INPUT_TAG: ${{ github.event.inputs.tag }}
+          PUSH_VERSION: ${{ needs.create-release.outputs.version }}
+          RELEASE_PRERELEASE: ${{ github.event.release.prerelease }}
         shell: bash
         run: |
-          if [ "$EVENT_NAME" = "release" ]; then
-            TAG="${GITHUB_REF#refs/tags/}"
-          else
-            TAG="$INPUT_TAG"
-          fi
+          case "$EVENT_NAME" in
+            push)    TAG="$PUSH_VERSION" ;;
+            release) TAG="${GITHUB_REF#refs/tags/}" ;;
+            *)       TAG="$INPUT_TAG" ;;
+          esac
           # Match the whole string (grep is line-based and would accept "latest\n<injected lines>").
           semver_re='^(latest|v?[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?)$'
           if [[ "$TAG" == *$'\n'* || "$TAG" == *$'\r'* || ! "$TAG" =~ $semver_re ]]; then
             echo "::error::Invalid release tag: must be 'latest' or a semantic version"
             exit 1
           fi
-          echo "IMAGE_TAG=$TAG" >> "$GITHUB_ENV"
+          # Image tags never carry the git tag's "v" prefix (e.g. v0.5.1 -> 0.5.1).
+          TAG="${TAG#v}"
+          # Move `latest` only for stable releases built from a release (not manual dispatches).
+          UPDATE_LATEST=false
+          if [[ "$EVENT_NAME" != "workflow_dispatch" && "$TAG" != *-* && "$RELEASE_PRERELEASE" != "true" ]]; then
+            UPDATE_LATEST=true
+          fi
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "update_latest=$UPDATE_LATEST" >> "$GITHUB_OUTPUT"
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@988b5a0280414f521da01fcc63a27aeeb4b104db # v3.6.1
@@ -113,14 +156,15 @@ jobs:
           IMAGE_TAG: ${{ steps.get_tag.outputs.tag }}
           PLATFORMS: linux/amd64,linux/arm64
 
-      - name: Update latest tags for releases
-        if: github.event_name == 'release'
+      - name: Update latest tags
+        if: steps.get_tag.outputs.update_latest == 'true'
+        env:
+          TAG: ${{ steps.get_tag.outputs.tag }}
         run: |
-          # Tag and push latest to both registries
           docker buildx imagetools create \
-            --tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest \
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.get_tag.outputs.tag }}
-          
+            --tag "${REGISTRY}/${IMAGE_NAME}:latest" \
+            "${REGISTRY}/${IMAGE_NAME}:${TAG}"
+
           docker buildx imagetools create \
-            --tag ${{ env.DOCKERHUB_REGISTRY }}/${{ env.IMAGE_NAME }}:latest \
-            ${{ env.DOCKERHUB_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.get_tag.outputs.tag }}
+            --tag "${DOCKERHUB_REGISTRY}/${IMAGE_NAME}:latest" \
+            "${DOCKERHUB_REGISTRY}/${IMAGE_NAME}:${TAG}"

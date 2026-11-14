@@ -5,7 +5,33 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.5.0] - Unreleased
+## [0.5.1] - 2026-11-14
+
+### Security
+- Fixed all 89 vulnerabilities reported by the Artifact Hub (Trivy) scan of image 0.5.0
+  (1 critical, 37 high, 43 medium, 6 low, 2 unknown), all in the Go binary:
+  - Go toolchain 1.25.0 → 1.26.11 (standard library, including CVE-2025-68121 in `crypto/tls`).
+  - `golang.org/x/net` 0.52.0 → 0.62.0, `golang.org/x/text` 0.35.0 → 0.44.0, `golang.org/x/sys` 0.42.0 → 0.50.0.
+  - `google.golang.org/grpc` 1.80.0 → 1.85.0, OpenTelemetry 1.43.0 → 1.47.0.
+  - `github.com/google/cel-go` 0.22.0 → 0.29.2, which required upgrading controller-runtime 0.20.0 → 0.25.2
+    and the Kubernetes libraries 0.32 → 0.37.
+
+### Changed
+- Minimum Go version is now 1.26 (`go 1.26.0`, `toolchain go1.26.11`); builder image `golang:1.26.11`.
+- controller-gen v0.17.1 → v0.23.0 and golangci-lint v2.1.6 → v2.15.0; envtest now runs against Kubernetes 1.37.
+- API scheme registration uses `k8s.io/apimachinery` `runtime.SchemeBuilder` instead of the deprecated
+  controller-runtime `scheme.Builder`.
+
+### Fixed
+- **Release pipeline**: releases are created with `GITHUB_TOKEN`, which never triggers a `release: published` run, so
+  since 0.4.3 the multi-arch build and the `latest` tag were never updated (`latest` was stuck at 0.4.3) and
+  versioned tags were single-arch images from `build.yaml`. The release workflow now builds and pushes the
+  multi-arch (`linux/amd64`, `linux/arm64`) image and moves `latest` in the same run that creates the release.
+  It also skips work when the release already exists.
+- `build.yaml` now pushes a rolling `main` image instead of overwriting the released version tag on every commit.
+- `make docker-buildx*` no longer ignores `docker buildx build` failures.
+
+## [0.5.0] - 2026-11-12
 
 ### Security
 - **Namespace confinement (breaking)**: A `CronJobScaleDown` can now only scale targets (`spec.targetRef.namespace`)
