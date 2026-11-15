@@ -27,7 +27,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   since 0.4.3 the multi-arch build and the `latest` tag were never updated (`latest` was stuck at 0.4.3) and
   versioned tags were single-arch images from `build.yaml`. The release workflow now builds and pushes the
   multi-arch (`linux/amd64`, `linux/arm64`) image and moves `latest` in the same run that creates the release.
-  It also skips work when the release already exists.
+  Runs are serialized, images are always built from the release's git tag, a run resumes publishing when a
+  release's images are missing or not multi-arch, and `latest` only ever points at the newest stable release.
+  Manual dispatches must name an existing release version (`latest` is no longer accepted).
 - `build.yaml` now pushes a rolling `main` image instead of overwriting the released version tag on every commit.
 - `make docker-buildx*` no longer ignores `docker buildx build` failures.
 

@@ -9,14 +9,19 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Release tag'
+        description: 'Existing release version to (re)build and publish, e.g. 0.5.1'
         required: true
-        default: 'latest'
 
 env:
   REGISTRY: ghcr.io
   DOCKERHUB_REGISTRY: docker.io
   IMAGE_NAME: cronschedules/cronjob-scale-down-operator
+
+# Serialize every run so release creation, image publishing and `latest` promotion
+# never interleave. Queued runs wait instead of being cancelled mid-publish.
+concurrency:
+  group: release-publish
+  cancel-in-progress: false
 
 # Releases created by this workflow use GITHUB_TOKEN, which does not trigger a new
 # `release: published` workflow run. The multi-arch image build and the `latest` tag
@@ -28,7 +33,6 @@ jobs:
     permissions:
       contents: write
     outputs:
-      created: ${{ steps.check_release.outputs.created }}
       version: ${{ steps.get_version.outputs.version }}
 
     steps:
@@ -54,7 +58,7 @@ jobs:
           VERSION: ${{ steps.get_version.outputs.version }}
         run: |
           if gh release view "v${VERSION}" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
-            echo "Release v${VERSION} already exists; skipping release and image publishing"
+            echo "Release v${VERSION} already exists; not creating it again"
             echo "created=false" >> "$GITHUB_OUTPUT"
           else
             echo "created=true" >> "$GITHUB_OUTPUT"
@@ -85,12 +89,13 @@ jobs:
   build-and-push-multiarch:
     runs-on: ubuntu-latest
     needs: create-release
-    # Runs after a new release is created from main, for manually published releases,
-    # and for manual dispatches. `always()` is needed because create-release is skipped
-    # for the release and workflow_dispatch events.
+    # `always()` is needed because create-release is skipped for release and
+    # workflow_dispatch events. On pushes to main this job only publishes when the
+    # current version's images are missing or incomplete (new or partially failed
+    # release), and re-asserts `latest` when that version is the newest stable release.
     if: >-
       always() && (
-        (github.event_name == 'push' && needs.create-release.result == 'success' && needs.create-release.outputs.created == 'true') ||
+        (github.event_name == 'push' && needs.create-release.result == 'success') ||
         github.event_name == 'release' ||
         github.event_name == 'workflow_dispatch'
       )
@@ -99,8 +104,36 @@ jobs:
       packages: write
 
     steps:
-      - name: Checkout repository
+      - name: Get image tag
+        id: get_tag
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_TAG: ${{ github.event.inputs.tag }}
+          PUSH_VERSION: ${{ needs.create-release.outputs.version }}
+        shell: bash
+        run: |
+          case "$EVENT_NAME" in
+            push)    TAG="$PUSH_VERSION" ;;
+            release) TAG="${GITHUB_REF#refs/tags/}" ;;
+            *)       TAG="$INPUT_TAG" ;;
+          esac
+          # Match the whole string (grep is line-based and would accept "0.5.1\n<injected lines>").
+          # Only released versions can be published; `latest` is managed by this workflow.
+          semver_re='^v?[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$'
+          if [[ "$TAG" == *$'\n'* || "$TAG" == *$'\r'* || ! "$TAG" =~ $semver_re ]]; then
+            echo "::error::Invalid release tag: must be a semantic version of an existing release"
+            exit 1
+          fi
+          # Image tags never carry the git tag's "v" prefix (e.g. v0.5.1 -> 0.5.1).
+          TAG="${TAG#v}"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+      # Always build from the release's git tag so an image never contains source that
+      # differs from the tag it is published under.
+      - name: Checkout release tag
         uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+        with:
+          ref: refs/tags/v${{ steps.get_tag.outputs.tag }}
 
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@9780b0c442fbb1117ed29e0efdff1e18412f7567 # v3.3.0
@@ -116,48 +149,56 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      - name: Get image tag
-        id: get_tag
-        env:
-          EVENT_NAME: ${{ github.event_name }}
-          INPUT_TAG: ${{ github.event.inputs.tag }}
-          PUSH_VERSION: ${{ needs.create-release.outputs.version }}
-          RELEASE_PRERELEASE: ${{ github.event.release.prerelease }}
-        shell: bash
-        run: |
-          case "$EVENT_NAME" in
-            push)    TAG="$PUSH_VERSION" ;;
-            release) TAG="${GITHUB_REF#refs/tags/}" ;;
-            *)       TAG="$INPUT_TAG" ;;
-          esac
-          # Match the whole string (grep is line-based and would accept "latest\n<injected lines>").
-          semver_re='^(latest|v?[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?)$'
-          if [[ "$TAG" == *$'\n'* || "$TAG" == *$'\r'* || ! "$TAG" =~ $semver_re ]]; then
-            echo "::error::Invalid release tag: must be 'latest' or a semantic version"
-            exit 1
-          fi
-          # Image tags never carry the git tag's "v" prefix (e.g. v0.5.1 -> 0.5.1).
-          TAG="${TAG#v}"
-          # Move `latest` only for stable releases built from a release (not manual dispatches).
-          UPDATE_LATEST=false
-          if [[ "$EVENT_NAME" != "workflow_dispatch" && "$TAG" != *-* && "$RELEASE_PRERELEASE" != "true" ]]; then
-            UPDATE_LATEST=true
-          fi
-          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
-          echo "update_latest=$UPDATE_LATEST" >> "$GITHUB_OUTPUT"
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@988b5a0280414f521da01fcc63a27aeeb4b104db # v3.6.1
 
+      - name: Plan publishing
+        id: plan
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          TAG: ${{ steps.get_tag.outputs.tag }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          # True when the tag exists in the registry as a linux/amd64 + linux/arm64 image.
+          is_multiarch() {
+            local platforms
+            platforms="$(docker buildx imagetools inspect --raw "$1" 2>/dev/null \
+              | jq -r '.manifests[]?.platform | select(. != null) | "\(.os)/\(.architecture)"' 2>/dev/null)" || return 1
+            grep -qx 'linux/amd64' <<<"$platforms" && grep -qx 'linux/arm64' <<<"$platforms"
+          }
+
+          PUBLISH=true
+          if [[ "$EVENT_NAME" == "push" ]] \
+            && is_multiarch "${REGISTRY}/${IMAGE_NAME}:${TAG}" \
+            && is_multiarch "${DOCKERHUB_REGISTRY}/${IMAGE_NAME}:${TAG}"; then
+            echo "Multi-arch images for ${TAG} already exist in both registries"
+            PUBLISH=false
+          fi
+
+          # Only the newest stable (non-draft, non-prerelease) release may own `latest`,
+          # so an older or concurrent build can never move it backwards.
+          HIGHEST="$(gh release list --repo "${GITHUB_REPOSITORY}" --exclude-drafts --exclude-pre-releases \
+            --limit 200 --json tagName --jq '.[].tagName' | sed 's/^v//' | sort -V | tail -n 1)"
+          PROMOTE=false
+          if [[ "$TAG" != *-* && "$TAG" == "$HIGHEST" ]]; then
+            PROMOTE=true
+          fi
+          echo "Newest stable release: ${HIGHEST:-none}; publish=${PUBLISH}; promote latest=${PROMOTE}"
+          echo "publish=$PUBLISH" >> "$GITHUB_OUTPUT"
+          echo "promote=$PROMOTE" >> "$GITHUB_OUTPUT"
+
       - name: Build and push multi-arch Docker images
+        if: steps.plan.outputs.publish == 'true'
         run: |
           make docker-buildx-all
         env:
           IMAGE_TAG: ${{ steps.get_tag.outputs.tag }}
           PLATFORMS: linux/amd64,linux/arm64
 
+      # Idempotent: re-points `latest` at the published version's manifest list.
       - name: Update latest tags
-        if: steps.get_tag.outputs.update_latest == 'true'
+        if: steps.plan.outputs.promote == 'true'
         env:
           TAG: ${{ steps.get_tag.outputs.tag }}
         run: |
