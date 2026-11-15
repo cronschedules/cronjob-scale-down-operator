@@ -44,6 +44,10 @@ linters:
           - lll
           - revive
           - staticcheck
+      # Repeated literals are idiomatic in table-driven tests and fixtures
+      - path: "_test\\.go"
+        linters:
+          - goconst
       # Exclude kubebuilder annotations from comment-spacings rule
       - source: "^//\\+kubebuilder:"
         linters:

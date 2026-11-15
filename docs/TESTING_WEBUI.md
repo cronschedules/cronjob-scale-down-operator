@@ -6,7 +6,7 @@ Test the Web UI feature locally or in a cluster.
 
 - Kubernetes cluster
 - kubectl configured
-- Go 1.23+ (for local development)
+- Go 1.26+ (for local development)
 
 ## Local Development
 
